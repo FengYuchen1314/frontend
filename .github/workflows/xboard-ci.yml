@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - xboard-dev
+      - 'wip/**'
   pull_request:
 permissions:
   contents: read

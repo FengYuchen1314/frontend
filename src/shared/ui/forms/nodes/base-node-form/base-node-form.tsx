@@ -9,7 +9,8 @@ import {
     GetNodePluginsCommand,
     GetNodeSecretKeyCommand,
     GetNodeCommand,
-    UpdateNodeCommand
+    UpdateNodeCommand,
+    SERVER_TYPES
 } from '@remnawave/backend-contract'
 import { NodeErrorMessageWidget } from '@widgets/dashboard/nodes/node-error-message'
 import { motion } from 'framer-motion'
@@ -23,6 +24,7 @@ import { ModalFooter } from '@shared/ui/modal-footer'
 
 import { NodeConfigProfilesCard } from './node-config-profiles.card'
 import { NodeConsumptionCard } from './node-consumption.card'
+import { NodeEdgeSettingsCard } from './node-edge-settings.card'
 import { NodeIpsCard } from './node-ips.card'
 import { NodeTrackingAndBillingCard } from './node-tracking-and-billing.card'
 import { NodeVitalsCard } from './node-vitals.card'
@@ -194,6 +196,10 @@ export const BaseNodeForm = <T extends UpdateNodeCommand.RequestBody>(props: IPr
                         />
                     </MotionStack>
                 </Group>
+            )}
+
+            {node.serverType === SERVER_TYPES.PUBLIC_DIRECT && (
+                <NodeEdgeSettingsCard key={node.uuid} node={node} />
             )}
 
             <ModalFooter isMobile={isMobile}>
