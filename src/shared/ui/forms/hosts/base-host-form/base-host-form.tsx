@@ -18,7 +18,7 @@ import {
     UpdateManyHostsCommand
 } from '@remnawave/backend-contract'
 import { INTERNAL_SQUADS_MODE, SECURITY_LAYERS } from '@remnawave/backend-contract'
-import { useCallback, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { HiQuestionMarkCircle } from 'react-icons/hi'
 import { PiArrowsLeftRight, PiFloppyDiskDuotone } from 'react-icons/pi'
@@ -80,27 +80,13 @@ export const BaseHostForm = <
     } = props
 
     const { i18n, t } = useTranslation()
-    const [internalSquadsMode, setInternalSquadsMode] = useState(
-        () => form.getValues().internalSquads?.mode
-    )
-    const [selectedMieruInbound, setSelectedMieruInbound] = useState(() => {
-        const { inbound } = form.getValues()
-        const selectedInbound = configProfiles
+    const internalSquadsMode = form.useWatchValue('internalSquads.mode')
+    const inbound = form.useWatchValue('inbound') as T['inbound']
+    const selectedMieruInbound = asManagedMieruInbound(
+        configProfiles
             ?.find((profile) => profile.uuid === inbound?.configProfileUuid)
             ?.inbounds.find((item) => item.uuid === inbound?.configProfileInboundUuid)
-
-        return asManagedMieruInbound(selectedInbound)
-    })
-
-    const watchInternalSquadsMode = useCallback(
-        ({ value }: { value: unknown }) =>
-            setInternalSquadsMode(
-                value as (typeof INTERNAL_SQUADS_MODE)[keyof typeof INTERNAL_SQUADS_MODE]
-            ),
-        []
     )
-
-    form.watch('internalSquads.mode', watchInternalSquadsMode)
 
     const isAllowOnlyInternalSquads = internalSquadsMode === INTERNAL_SQUADS_MODE.ALLOW_ONLY
     const { error: _internalSquadsModeError, ...internalSquadsModeProps } =
@@ -147,11 +133,6 @@ export const BaseHostForm = <
     }
 
     const saveInbound = (inbound: string, configProfileUuid: string) => {
-        const selectedInbound = configProfiles
-            ?.find((profile) => profile.uuid === configProfileUuid)
-            ?.inbounds.find((item) => item.uuid === inbound)
-
-        setSelectedMieruInbound(asManagedMieruInbound(selectedInbound))
         form.setValues({
             inbound: {
                 configProfileInboundUuid: inbound,

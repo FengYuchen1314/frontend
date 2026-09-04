@@ -29,6 +29,25 @@ const graphWith = (...nodes: TopologyGraph['nodes']): TopologyGraph => ({
 })
 
 describe('topology graph safety', () => {
+    it('rejects merging branches directly into a proxy without a load balancer', () => {
+        const graph = graphWith(
+            proxy('a', 'server-a'),
+            proxy('b', 'server-b'),
+            proxy('c', 'server-c')
+        )
+        const entry = graph.nodes.find((node) => node.kind === 'ENTRY')!
+        const exit = graph.nodes.find((node) => node.kind === 'EXIT')!
+        graph.edges = [
+            { id: '1', source: entry.id, target: 'a' },
+            { id: '2', source: entry.id, target: 'b' },
+            { id: '3', source: 'a', target: 'c' },
+            { id: '4', source: 'b', target: 'c' },
+            { id: '5', source: 'c', target: exit.id }
+        ]
+        assert.ok(
+            validateTopologyGraph(graph).some((issue) => issue.code === 'INVALID_PROXY_DEGREE')
+        )
+    })
     it('creates backend-compatible UUID identifiers for a new canvas', () => {
         const graph = createEmptyTopologyGraph()
         const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i

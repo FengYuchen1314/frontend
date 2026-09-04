@@ -21,6 +21,10 @@ import {
     type TopologyNode
 } from '@features/dashboard/topology/lib/topology-graph'
 import {
+    getTopologyMutationRevision,
+    type TopologyRevision
+} from '@features/dashboard/topology/lib/topology-revision'
+import {
     Accordion,
     ActionIcon,
     Alert,
@@ -627,7 +631,7 @@ export function TopologyPageConnector() {
     const [serverIssues, setServerIssues] = useState<TopologyServerIssue[]>([])
     const [preview, setPreview] = useState<null | TopologyPreview>(null)
     const [resourceSearch, setResourceSearch] = useState('')
-    const loadedVersionRef = useRef<null | string>(null)
+    const loadedVersionRef = useRef<TopologyRevision | null>(null)
 
     const nodesByUuid = useMemo(
         () => new Map((nodes ?? []).map((node) => [node.uuid, node])),
@@ -685,14 +689,18 @@ export function TopologyPageConnector() {
         setHasConflict(false)
         setServerIssues([])
         setPreview(null)
-        loadedVersionRef.current = `${topology.uuid}:${topology.version}`
+        loadedVersionRef.current = { uuid: topology.uuid, version: topology.version }
     }
 
     useEffect(() => {
         if (!selectedTopology || selectedTopology.uuid !== selectedUuid) return
-        const versionKey = `${selectedTopology.uuid}:${selectedTopology.version}`
-        if (loadedVersionRef.current === versionKey) return
-        if (isDirty && loadedVersionRef.current?.startsWith(`${selectedTopology.uuid}:`)) return
+        const loaded = loadedVersionRef.current
+        if (loaded?.uuid === selectedTopology.uuid && loaded.version === selectedTopology.version)
+            return
+        if (isDirty && loaded?.uuid === selectedTopology.uuid) {
+            setHasConflict(true)
+            return
+        }
         loadTopology(selectedTopology)
     }, [selectedTopology, selectedUuid])
 
@@ -924,6 +932,9 @@ export function TopologyPageConnector() {
         }
 
         try {
+            const revision = selectedUuid
+                ? getTopologyMutationRevision(selectedUuid, loadedVersionRef.current)
+                : null
             const validation = await validateTopology.mutateAsync(graph)
             setServerIssues(validation.issues)
             if (!validation.valid) {
@@ -935,10 +946,10 @@ export function TopologyPageConnector() {
                 return
             }
 
-            const saved = selectedTopology
+            const saved = revision
                 ? await updateTopology.mutateAsync({
-                      uuid: selectedTopology.uuid,
-                      expectedVersion: selectedTopology.version,
+                      uuid: revision.uuid,
+                      expectedVersion: revision.version,
                       name: name.trim(),
                       graph
                   })
@@ -975,6 +986,10 @@ export function TopologyPageConnector() {
 
     const handleDelete = () => {
         if (!selectedTopology) return
+        const revision = getTopologyMutationRevision(
+            selectedTopology.uuid,
+            loadedVersionRef.current
+        )
         modals.openConfirmModal({
             title: t('topology.delete.title'),
             children: <Text size="sm">{t('topology.delete.message')}</Text>,
@@ -986,8 +1001,8 @@ export function TopologyPageConnector() {
             onConfirm: async () => {
                 try {
                     await deleteTopology.mutateAsync({
-                        uuid: selectedTopology.uuid,
-                        expectedVersion: selectedTopology.version
+                        uuid: revision.uuid,
+                        expectedVersion: revision.version
                     })
                     startNew()
                     notifications.show({

@@ -126,7 +126,14 @@ export const EditHostDrawerContent = (props: IProps) => {
         })
     })
 
-    if (!configProfiles || !nodes || !templates || !internalSquads || !hostTags) {
+    if (
+        !form.initialized ||
+        !configProfiles ||
+        !nodes ||
+        !templates ||
+        !internalSquads ||
+        !hostTags
+    ) {
         return <LoaderModalShared mih="78vh" />
     }
 

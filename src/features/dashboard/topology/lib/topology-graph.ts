@@ -379,19 +379,23 @@ export const validateTopologyGraph = (graph: TopologyGraph): TopologyIssue[] => 
     }
     for (const exit of exits) {
         if (
-            (incoming.get(exit.id)?.length ?? 0) < 1 ||
+            (incoming.get(exit.id)?.length ?? 0) !== 1 ||
             (outgoing.get(exit.id)?.length ?? 0) !== 0
         ) {
             issues.push({
                 code: 'INVALID_EXIT_DEGREE',
-                message: 'Exit needs at least one incoming connection and no outgoing connection.',
+                message:
+                    'Exit needs exactly one incoming connection; merge branches with a load balancer.',
                 nodeIds: [exit.id],
                 severity: 'ERROR'
             })
         }
     }
     for (const proxy of proxies) {
-        if ((outgoing.get(proxy.id)?.length ?? 0) !== 1) {
+        if (
+            (outgoing.get(proxy.id)?.length ?? 0) !== 1 ||
+            (incoming.get(proxy.id)?.length ?? 0) !== 1
+        ) {
             issues.push({
                 code: 'INVALID_PROXY_DEGREE',
                 message: 'Every proxy needs exactly one next hop.',

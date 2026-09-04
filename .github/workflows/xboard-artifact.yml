@@ -192,13 +192,15 @@ jobs:
           GH_TOKEN: ${{ secrets.XBOARD_BACKEND_ACTIONS_TOKEN }}
         shell: bash
         run: |
-          run_id="$(gh run list \
+          gh workflow run xboard-image.yml \
             --repo FengYuchen1314/backend \
-            --workflow xboard-image.yml \
-            --branch xboard-dev \
-            --status completed \
-            --limit 1 \
-            --json databaseId \
-            --jq '.[0].databaseId')"
-          [[ "$run_id" =~ ^[0-9]+$ ]]
-          gh run rerun "$run_id" --repo FengYuchen1314/backend
+            --ref xboard-dev \
+            -f "frontend_commit=$GITHUB_SHA"
+
+      - name: Explain the manual paired-image release when dispatch is unavailable
+        if: env.GH_TOKEN == ''
+        env:
+          GH_TOKEN: ${{ secrets.XBOARD_BACKEND_ACTIONS_TOKEN }}
+        run: |
+          echo 'Frontend artifact published; no backend image was requested because cross-repository dispatch is not configured.' >> "$GITHUB_STEP_SUMMARY"
+          echo "Publish the paired image with: gh workflow run xboard-image.yml --repo FengYuchen1314/backend --ref xboard-dev -f frontend_commit=$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
