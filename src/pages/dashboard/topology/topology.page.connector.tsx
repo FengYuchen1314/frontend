@@ -22,6 +22,7 @@ import {
 } from '@features/dashboard/topology/lib/topology-graph'
 import {
     getTopologyMutationRevision,
+    TopologyDraftRequests,
     type TopologyRevision
 } from '@features/dashboard/topology/lib/topology-revision'
 import {
@@ -633,6 +634,7 @@ export function TopologyPageConnector() {
     const [preview, setPreview] = useState<null | TopologyPreview>(null)
     const [resourceSearch, setResourceSearch] = useState('')
     const loadedVersionRef = useRef<TopologyRevision | null>(null)
+    const draftRequestsRef = useRef(new TopologyDraftRequests())
 
     const nodesByUuid = useMemo(
         () => new Map((nodes ?? []).map((node) => [node.uuid, node])),
@@ -684,6 +686,7 @@ export function TopologyPageConnector() {
     )
 
     const loadTopology = (topology: SubscriptionTopology) => {
+        draftRequestsRef.current.invalidate()
         setName(topology.name)
         setLoadedIsPublished(topology.isPublished)
         setGraph(topology.graph)
@@ -707,6 +710,11 @@ export function TopologyPageConnector() {
     }, [selectedTopology, selectedUuid])
 
     useEffect(() => {
+        const requests = draftRequestsRef.current
+        return () => requests.invalidate()
+    }, [])
+
+    useEffect(() => {
         if (!isDirty) return
         const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
             event.preventDefault()
@@ -716,6 +724,7 @@ export function TopologyPageConnector() {
     }, [isDirty])
 
     const updateGraph = (updater: (current: TopologyGraph) => TopologyGraph) => {
+        draftRequestsRef.current.invalidate()
         setGraph((current) => updater(current))
         setIsDirty(true)
         setHasConflict(false)
@@ -869,6 +878,7 @@ export function TopologyPageConnector() {
     }
 
     const startNew = () => {
+        draftRequestsRef.current.invalidate()
         setSelectedUuid(null)
         setLoadedIsPublished(false)
         setName('')
@@ -882,6 +892,7 @@ export function TopologyPageConnector() {
 
     const handleSelectTopology = (uuid: null | string) => {
         if (uuid === selectedUuid) return
+        draftRequestsRef.current.invalidate()
         setSelectedUuid(uuid)
         setLoadedIsPublished(false)
         setIsDirty(false)
@@ -935,11 +946,13 @@ export function TopologyPageConnector() {
             return
         }
 
+        const isCurrent = draftRequestsRef.current.begin('mutation')
         try {
             const revision = selectedUuid
                 ? getTopologyMutationRevision(selectedUuid, loadedVersionRef.current)
                 : null
             const validation = await validateTopology.mutateAsync(graph)
+            if (!isCurrent()) return
             setServerIssues(validation.issues)
             if (!validation.valid) {
                 notifications.show({
@@ -958,6 +971,7 @@ export function TopologyPageConnector() {
                       graph
                   })
                 : await createTopology.mutateAsync({ name: name.trim(), graph })
+            if (!isCurrent()) return
             setSelectedUuid(saved.uuid)
             loadTopology(saved)
             notifications.show({
@@ -966,6 +980,7 @@ export function TopologyPageConnector() {
                 message: t('topology.messages.saved')
             })
         } catch (error) {
+            if (!isCurrent()) return
             if (isTopologyVersionConflict(error)) {
                 setHasConflict(true)
                 notifications.show({
@@ -985,6 +1000,7 @@ export function TopologyPageConnector() {
 
     const handlePublication = async () => {
         if (!selectedUuid || isDirty || hasConflict) return
+        const isCurrent = draftRequestsRef.current.begin('mutation')
         try {
             const revision = getTopologyMutationRevision(selectedUuid, loadedVersionRef.current)
             const saved = await updateTopology.mutateAsync({
@@ -992,6 +1008,7 @@ export function TopologyPageConnector() {
                 expectedVersion: revision.version,
                 isPublished: !loadedIsPublished
             })
+            if (!isCurrent()) return
             loadTopology(saved)
             notifications.show({
                 color: 'teal',
@@ -1003,6 +1020,7 @@ export function TopologyPageConnector() {
                 message: t('topology.publication.next-refresh')
             })
         } catch (error) {
+            if (!isCurrent()) return
             if (isTopologyVersionConflict(error)) setHasConflict(true)
             notifications.show({
                 color: 'red',
@@ -1015,8 +1033,9 @@ export function TopologyPageConnector() {
     }
 
     const handleReloadLatest = async () => {
+        const isCurrent = draftRequestsRef.current.begin('reload')
         const result = await refetchSelected()
-        if (result.data) loadTopology(result.data)
+        if (isCurrent() && result.data?.uuid === selectedUuid) loadTopology(result.data)
     }
 
     const handleDelete = () => {
@@ -1025,6 +1044,7 @@ export function TopologyPageConnector() {
             selectedTopology.uuid,
             loadedVersionRef.current
         )
+        const isCurrent = draftRequestsRef.current.begin('mutation')
         modals.openConfirmModal({
             title: t('topology.delete.title'),
             children: <Text size="sm">{t('topology.delete.message')}</Text>,
@@ -1034,11 +1054,25 @@ export function TopologyPageConnector() {
             },
             confirmProps: { color: 'red' },
             onConfirm: async () => {
+                if (!isCurrent()) return
                 try {
                     await deleteTopology.mutateAsync({
                         uuid: revision.uuid,
                         expectedVersion: revision.version
                     })
+                    if (!isCurrent()) {
+                        if (loadedVersionRef.current?.uuid === revision.uuid) {
+                            // The deleted graph was edited while awaiting the response. Keep the
+                            // edits as a new unsaved draft instead of clearing them or saving to 404.
+                            draftRequestsRef.current.invalidate()
+                            setSelectedUuid(null)
+                            setLoadedIsPublished(false)
+                            loadedVersionRef.current = null
+                            setIsDirty(true)
+                            setHasConflict(false)
+                        }
+                        return
+                    }
                     startNew()
                     notifications.show({
                         color: 'teal',
@@ -1046,6 +1080,7 @@ export function TopologyPageConnector() {
                         message: t('topology.messages.deleted')
                     })
                 } catch (error) {
+                    if (!isCurrent()) return
                     if (isTopologyVersionConflict(error)) {
                         setHasConflict(true)
                         return
@@ -1069,14 +1104,17 @@ export function TopologyPageConnector() {
             })
             return
         }
+        const isCurrent = draftRequestsRef.current.begin('preview')
         try {
             const nextPreview = await previewTopology.mutateAsync({
                 graph,
                 formats: [...TOPOLOGY_FORMATS]
             })
+            if (!isCurrent()) return
             setPreview(nextPreview)
             setServerIssues(nextPreview.issues)
         } catch (error) {
+            if (!isCurrent()) return
             notifications.show({
                 color: 'red',
                 title: t('topology.preview.failed'),
@@ -1220,6 +1258,7 @@ export function TopologyPageConnector() {
                                 <TextInput
                                     label={t('topology.fields.name')}
                                     onChange={(event) => {
+                                        draftRequestsRef.current.invalidate()
                                         setName(event.currentTarget.value)
                                         setIsDirty(true)
                                     }}
