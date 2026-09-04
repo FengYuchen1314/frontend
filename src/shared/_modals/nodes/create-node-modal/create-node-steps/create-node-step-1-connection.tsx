@@ -14,7 +14,7 @@ import {
     UnstyledButton
 } from '@mantine/core'
 import { UseFormReturnType } from '@mantine/form'
-import { CreateNodeCommand } from '@remnawave/backend-contract'
+import { CreateNodeCommand, SERVER_TYPES } from '@remnawave/backend-contract'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { PiArrowRight, PiTagDuotone } from 'react-icons/pi'
@@ -24,6 +24,7 @@ import {
     TbId,
     TbMapPin,
     TbPackage,
+    TbServer,
     TbSettings,
     TbWorld
 } from 'react-icons/tb'
@@ -126,6 +127,34 @@ export const CreateNodeStep1Connection = ({ form, onNext, secretKey, port }: IPr
                         leftSection={<TbMapPin size={16} />}
                         placeholder={t('base-node-form.select-country')}
                         searchable
+                        size="sm"
+                        styles={{
+                            label: { fontWeight: 500 }
+                        }}
+                    />
+
+                    <Select
+                        key={form.key('serverType')}
+                        label={t('base-node-form.server-type')}
+                        {...form.getInputProps('serverType')}
+                        allowDeselect={false}
+                        data={[
+                            {
+                                label: t('base-node-form.server-type-public-direct'),
+                                value: SERVER_TYPES.PUBLIC_DIRECT
+                            },
+                            {
+                                label: t('base-node-form.server-type-leased-line'),
+                                value: SERVER_TYPES.LEASED_LINE
+                            },
+                            {
+                                label: t('base-node-form.server-type-broadband-landing'),
+                                value: SERVER_TYPES.BROADBAND_LANDING
+                            }
+                        ]}
+                        description={t('base-node-form.server-type-description')}
+                        leftSection={<TbServer size={16} />}
+                        required
                         size="sm"
                         styles={{
                             label: { fontWeight: 500 }

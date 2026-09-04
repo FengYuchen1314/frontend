@@ -1,7 +1,7 @@
 import NiceModal, { useModal } from '@ebay/nice-modal-react'
 import { Group, Modal, Progress, Stack, Transition } from '@mantine/core'
 import { useForm, schemaResolver } from '@mantine/form'
-import { CreateNodeCommand } from '@remnawave/backend-contract'
+import { CreateNodeCommand, SERVER_TYPES } from '@remnawave/backend-contract'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { TbCpu } from 'react-icons/tb'
@@ -71,12 +71,11 @@ export const CreateNodeModal = NiceModal.create(() => {
     const prevStep = () => setActiveStep((current) => (current > 0 ? current - 1 : current))
 
     useEffect(() => {
-        if (form.getValues().port) {
-            return
-        }
+        const values = form.getValues()
 
         form.setValues({
-            port: 2222
+            port: values.port ?? 2222,
+            serverType: values.serverType ?? SERVER_TYPES.PUBLIC_DIRECT
         })
     }, [form])
 

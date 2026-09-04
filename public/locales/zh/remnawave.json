@@ -384,6 +384,11 @@
   "base-node-form": {
     "country": "国家",
     "select-country": "选择国家",
+    "server-type": "服务器类型",
+    "server-type-description": "请先选择服务器用途，再复制 Agent 安装命令。",
+    "server-type-public-direct": "公网直连",
+    "server-type-leased-line": "专线",
+    "server-type-broadband-landing": "家宽落地",
     "internal-name": "内部名称",
     "internal-name-placeholder": "例如：US-NY-Node-01 ",
     "e-g-example-com": "例如 example.com",

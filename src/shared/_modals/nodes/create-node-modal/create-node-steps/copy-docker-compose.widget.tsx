@@ -22,7 +22,7 @@ export const CopyDockerComposeWidget = ({ port }: IProps) => {
   remnanode:
     container_name: remnanode
     hostname: remnanode
-    image: remnawave/node:latest
+    image: ghcr.io/fengyuchen1314/node:xboard-dev
     network_mode: host
     restart: always
     cap_add:

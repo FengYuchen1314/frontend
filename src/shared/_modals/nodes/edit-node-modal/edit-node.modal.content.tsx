@@ -82,6 +82,7 @@ export const EditNodeByUuidModalContent = (props: IProps) => {
             isFormInitialized.current = true
             form.initialize({
                 uuid: fetchedNode.uuid,
+                serverType: fetchedNode.serverType,
                 countryCode: fetchedNode.countryCode,
                 name: fetchedNode.name,
                 address: fetchedNode.address,

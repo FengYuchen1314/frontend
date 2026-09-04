@@ -1,0 +1,79 @@
+name: Build Xboard Frontend Artifact
+
+on:
+  push:
+    branches:
+      - xboard-dev
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: xboard-frontend-artifact
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and publish test artifact
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.20.0
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit --no-fund
+
+      - name: Use the fork Backend contract
+        shell: bash
+        run: |
+          git clone --depth 1 --branch xboard-dev \
+            https://github.com/FengYuchen1314/backend.git \
+            "$RUNNER_TEMP/xboard-backend"
+          npm install \
+            --prefix "$RUNNER_TEMP/xboard-backend/libs/contract" \
+            --no-audit \
+            --no-fund \
+            --no-package-lock
+          npm run --prefix "$RUNNER_TEMP/xboard-backend/libs/contract" build
+          contract_tarball=$(npm pack \
+            "$RUNNER_TEMP/xboard-backend/libs/contract" \
+            --pack-destination "$RUNNER_TEMP" \
+            --silent)
+          npm install \
+            --no-audit \
+            --no-fund \
+            --no-package-lock \
+            --no-save \
+            "$RUNNER_TEMP/$contract_tarball"
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run start:build
+
+      - name: Create release archive
+        run: zip -r remnawave-frontend.zip ./dist
+
+      - name: Publish test artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if ! gh release view xboard-dev-build >/dev/null 2>&1; then
+            gh release create xboard-dev-build \
+              --prerelease \
+              --target "$GITHUB_SHA" \
+              --title "Xboard development build" \
+              --notes "Mutable test artifact built from the xboard-dev branch."
+          fi
+          gh release upload xboard-dev-build remnawave-frontend.zip --clobber

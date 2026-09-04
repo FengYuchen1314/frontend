@@ -15,6 +15,7 @@ import {
     GetNodeIntegrationsCommand,
     GetNodePluginsCommand,
     GetNodeSecretKeyCommand,
+    SERVER_TYPES,
     UpdateNodeCommand
 } from '@remnawave/backend-contract'
 import { ForwardRefComponent, HTMLMotionProps, Variants } from 'motion/react'
@@ -95,6 +96,33 @@ export const NodeVitalsCard = <
                             placeholder={t('base-node-form.select-country')}
                             required
                             searchable
+                            styles={{
+                                label: { fontWeight: 500 }
+                            }}
+                        />
+
+                        <Select
+                            key={form.key('serverType')}
+                            label={t('base-node-form.server-type')}
+                            {...form.getInputProps('serverType')}
+                            allowDeselect={false}
+                            data={[
+                                {
+                                    label: t('base-node-form.server-type-public-direct'),
+                                    value: SERVER_TYPES.PUBLIC_DIRECT
+                                },
+                                {
+                                    label: t('base-node-form.server-type-leased-line'),
+                                    value: SERVER_TYPES.LEASED_LINE
+                                },
+                                {
+                                    label: t('base-node-form.server-type-broadband-landing'),
+                                    value: SERVER_TYPES.BROADBAND_LANDING
+                                }
+                            ]}
+                            description={t('base-node-form.server-type-description')}
+                            leftSection={<TbNetwork size={16} />}
+                            required
                             styles={{
                                 label: { fontWeight: 500 }
                             }}
