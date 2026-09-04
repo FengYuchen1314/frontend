@@ -209,6 +209,8 @@
     "feature": {
       "restart-all-nodes": "Restart all nodes",
       "search-nodes": "Search nodes",
+      "create-managed-node": "Create managed node",
+      "import-external-node": "Import external Node Agent",
       "force-restart-description": "Guarantees that all nodes fully restart Xray Core.",
       "graceful-restart-description-1": "Sends a request to all nodes to restart Xray, but the request may go unfulfilled if the node hash matches the current one. This is the default option.",
       "force": "Force",
@@ -244,12 +246,15 @@
   "create-node-modal": {
     "widget": {
       "create-node": "Create node",
+      "import-external-node": "Import external node",
       "back": "Back",
       "connection-successful": "Connection successful",
       "connection-failed": "Connection failed",
       "open-node": "Open node",
+      "external-import-title": "External Agent import",
+      "external-import-description": "All existing inbounds, including hidden or legacy protocols, are available. The target must already run a Remnawave-compatible Node Agent; arbitrary proxy links cannot be imported here.",
       "socks5-warning-title": "SOCKS5 is unencrypted",
-      "socks5-warning-description": "Forward the selected TCP/UDP port from the domestic entry router or NAT to this server's IX port. SOCKS5 credentials and traffic are plaintext, so add access controls or a trusted encrypted tunnel.",
+      "socks5-warning-description": "Forward the selected TCP port from the domestic entry router or NAT to this server's IX port. UDP relay is disabled. SOCKS5 credentials and traffic are plaintext, so add access controls or a trusted encrypted tunnel.",
       "socks5-public-direct-warning-title": "Extremely discouraged for public-direct servers",
       "socks5-public-direct-warning-description": "SOCKS5 credentials and traffic are plaintext. Select this only if you understand the exposure and have appropriate network-level protection.",
       "mieru-unavailable-title": "Mieru is not connected yet",
@@ -1099,7 +1104,8 @@
     "learn-more": "Learn more.",
     "domain-or-ip": "Domain or IP",
     "additional-options": "Additional options",
-    "panel-bootstrap-description": "Choose the server type and port, then generate the one-time install command below. The Node downloads its deployment files directly from this panel."
+    "panel-bootstrap-description": "Choose the server type and port, then generate the one-time install command below. The Node downloads its deployment files directly from this panel.",
+    "external-import-description": "Enter the connection details of a server that already runs a Remnawave-compatible Node Agent. This flow does not import arbitrary SOCKS, VLESS, or subscription links."
   },
   "create-node-step-3-status": {
     "establishing-mtls-connection": "Establishing mTLS connection...",

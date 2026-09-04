@@ -1,7 +1,7 @@
 import { ShowConfigProfilesWithInboundsFeature } from '@features/ui/dashboard/nodes/show-config-profiles-with-inbounds'
 import { Alert, Button, Group, Skeleton, Stack, Text } from '@mantine/core'
 import { UseFormReturnType } from '@mantine/form'
-import { CreateNodeCommand, SERVER_TYPES } from '@remnawave/backend-contract'
+import { CreateNodeCommand, SERVER_TYPES, TNodeCreationMode } from '@remnawave/backend-contract'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { PiArrowLeft } from 'react-icons/pi'
@@ -9,7 +9,10 @@ import { SiSecurityscorecard } from 'react-icons/si'
 import { TbAlertTriangle, TbCheck, TbInfoCircle } from 'react-icons/tb'
 
 import { useGetConfigProfiles } from '@shared/api/hooks'
-import { isManagedProtocolCreationInboundForServerType } from '@shared/constants'
+import {
+    isManagedProtocolCreationInboundForServerType,
+    shouldRestrictNodeCreationToManagedProtocols
+} from '@shared/constants'
 import { BaseOverlayHeader } from '@shared/ui/overlays/base-overlay-header'
 import { SectionCard } from '@shared/ui/section-card'
 
@@ -18,6 +21,7 @@ import { CopyDockerComposeWidget } from './copy-docker-compose.widget'
 interface IProps {
     // oxlint-disable-next-line
     form: UseFormReturnType<CreateNodeCommand.RequestBody, any>
+    creationMode: TNodeCreationMode
     isCreating: boolean
     onCreateNode: () => void
     onPrev: () => void
@@ -25,6 +29,7 @@ interface IProps {
 }
 
 export const CreateNodeStep2ConfigProfiles = ({
+    creationMode,
     form,
     isCreating,
     onCreateNode,
@@ -33,11 +38,12 @@ export const CreateNodeStep2ConfigProfiles = ({
 }: IProps) => {
     const { t } = useTranslation()
     const [isBootstrapGenerated, setIsBootstrapGenerated] = useState(false)
+    const isManagedCreation = shouldRestrictNodeCreationToManagedProtocols(creationMode)
 
     const { data: configProfiles, isLoading: isConfigProfilesLoading } = useGetConfigProfiles()
     const serverType = form.getValues().serverType ?? SERVER_TYPES.PUBLIC_DIRECT
-    const isBroadbandLanding = serverType === SERVER_TYPES.BROADBAND_LANDING
-    const isLeasedLine = serverType === SERVER_TYPES.LEASED_LINE
+    const isBroadbandLanding = isManagedCreation && serverType === SERVER_TYPES.BROADBAND_LANDING
+    const isLeasedLine = isManagedCreation && serverType === SERVER_TYPES.LEASED_LINE
     const selectedInboundUuids = new Set(form.getValues().configProfile?.activeInbounds ?? [])
     const isSocksSelected = (configProfiles?.configProfiles ?? []).some((profile) =>
         profile.inbounds.some(
@@ -46,19 +52,25 @@ export const CreateNodeStep2ConfigProfiles = ({
         )
     )
 
-    const compatibleInboundUuids = useMemo(
-        () =>
-            new Set(
+    const compatibleInboundUuids = useMemo(() => {
+        if (!isManagedCreation) {
+            return new Set(
                 (configProfiles?.configProfiles ?? []).flatMap((profile) =>
-                    profile.inbounds
-                        .filter((inbound) =>
-                            isManagedProtocolCreationInboundForServerType(inbound, serverType)
-                        )
-                        .map((inbound) => inbound.uuid)
+                    profile.inbounds.map((inbound) => inbound.uuid)
                 )
-            ),
-        [configProfiles, serverType]
-    )
+            )
+        }
+
+        return new Set(
+            (configProfiles?.configProfiles ?? []).flatMap((profile) =>
+                profile.inbounds
+                    .filter((inbound) =>
+                        isManagedProtocolCreationInboundForServerType(inbound, serverType)
+                    )
+                    .map((inbound) => inbound.uuid)
+            )
+        )
+    }, [configProfiles, isManagedCreation, serverType])
 
     useEffect(() => {
         const selectedInbounds = form.getValues().configProfile?.activeInbounds ?? []
@@ -143,22 +155,42 @@ export const CreateNodeStep2ConfigProfiles = ({
                                     </Text>
                                 </Alert>
                             ) : (
-                                <ShowConfigProfilesWithInboundsFeature
-                                    activeConfigProfileInbounds={
-                                        form.getValues().configProfile?.activeInbounds ?? []
-                                    }
-                                    activeConfigProfileUuid={
-                                        form.getValues().configProfile?.activeConfigProfileUuid
-                                    }
-                                    configProfiles={configProfiles.configProfiles}
-                                    errors={form.errors.configProfile}
-                                    managedProtocolCreationOnly
-                                    onSaveInbounds={saveInbounds}
-                                    serverType={serverType}
-                                />
+                                <>
+                                    {!isManagedCreation && (
+                                        <Alert
+                                            color="blue"
+                                            icon={<TbInfoCircle size={18} />}
+                                            mb="md"
+                                            title={t(
+                                                'create-node-modal.widget.external-import-title'
+                                            )}
+                                            variant="light"
+                                        >
+                                            <Text size="sm">
+                                                {t(
+                                                    'create-node-modal.widget.external-import-description'
+                                                )}
+                                            </Text>
+                                        </Alert>
+                                    )}
+
+                                    <ShowConfigProfilesWithInboundsFeature
+                                        activeConfigProfileInbounds={
+                                            form.getValues().configProfile?.activeInbounds ?? []
+                                        }
+                                        activeConfigProfileUuid={
+                                            form.getValues().configProfile?.activeConfigProfileUuid
+                                        }
+                                        configProfiles={configProfiles.configProfiles}
+                                        errors={form.errors.configProfile}
+                                        managedProtocolCreationOnly={isManagedCreation}
+                                        onSaveInbounds={saveInbounds}
+                                        serverType={isManagedCreation ? serverType : undefined}
+                                    />
+                                </>
                             )}
 
-                            {(isBroadbandLanding || isSocksSelected) && (
+                            {isManagedCreation && (isBroadbandLanding || isSocksSelected) && (
                                 <Alert
                                     color={isBroadbandLanding ? 'orange' : 'red'}
                                     icon={<TbAlertTriangle size={18} />}
@@ -185,7 +217,7 @@ export const CreateNodeStep2ConfigProfiles = ({
             </SectionCard.Root>
 
             <Stack gap="xs" mt="auto">
-                {!isLeasedLine && (
+                {isManagedCreation && !isLeasedLine && (
                     <CopyDockerComposeWidget
                         key={port}
                         onGenerated={() => setIsBootstrapGenerated(true)}
@@ -196,7 +228,7 @@ export const CreateNodeStep2ConfigProfiles = ({
                 <Group justify="space-between">
                     <Button
                         color="gray"
-                        disabled={isBootstrapGenerated}
+                        disabled={isManagedCreation && isBootstrapGenerated}
                         leftSection={<PiArrowLeft size={18} />}
                         onClick={onPrev}
                         size="md"
@@ -205,14 +237,18 @@ export const CreateNodeStep2ConfigProfiles = ({
                     </Button>
                     <Button
                         color="teal"
-                        disabled={!isBootstrapGenerated || isLeasedLine}
+                        disabled={isManagedCreation && (!isBootstrapGenerated || isLeasedLine)}
                         leftSection={<TbCheck size={18} />}
                         loading={isCreating}
                         onClick={handleCreateNode}
                         size="md"
                         type="submit"
                     >
-                        {t('create-node-modal.widget.create-node')}
+                        {t(
+                            isManagedCreation
+                                ? 'create-node-modal.widget.create-node'
+                                : 'create-node-modal.widget.import-external-node'
+                        )}
                     </Button>
                 </Group>
             </Stack>

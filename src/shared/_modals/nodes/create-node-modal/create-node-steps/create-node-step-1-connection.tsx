@@ -13,7 +13,12 @@ import {
     UnstyledButton
 } from '@mantine/core'
 import { UseFormReturnType } from '@mantine/form'
-import { CreateNodeCommand, SERVER_TYPES } from '@remnawave/backend-contract'
+import {
+    CreateNodeCommand,
+    NODE_CREATION_MODES,
+    SERVER_TYPES,
+    TNodeCreationMode
+} from '@remnawave/backend-contract'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { PiArrowRight, PiTagDuotone } from 'react-icons/pi'
@@ -35,11 +40,13 @@ import { TagInputPill } from '@shared/ui/tag-input-pill'
 interface IProps {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     form: UseFormReturnType<CreateNodeCommand.RequestBody, any>
+    creationMode: TNodeCreationMode
     onNext: () => void
 }
 
-export const CreateNodeStep1Connection = ({ form, onNext }: IProps) => {
+export const CreateNodeStep1Connection = ({ creationMode, form, onNext }: IProps) => {
     const { t } = useTranslation()
+    const isExternalImport = creationMode === NODE_CREATION_MODES.EXTERNAL_IMPORT
 
     const { data: nodePlugins } = useGetNodePlugins()
     const { data: nodesTags } = useGetNodesTags()
@@ -72,19 +79,25 @@ export const CreateNodeStep1Connection = ({ form, onNext }: IProps) => {
             }}
         >
             <Stack gap="xs" mih={400}>
-                <Text c="dimmed" size="sm">
-                    {t('create-node-step-1-connection.panel-bootstrap-description')}{' '}
-                    <Anchor
-                        fw="700"
-                        href="https://docs.rw/docs/install/remnawave-node"
-                        inherit
-                        rel="noopener noreferrer"
-                        target="_blank"
-                        underline="hover"
-                    >
-                        {t('create-node-step-1-connection.learn-more')}
-                    </Anchor>
-                </Text>
+                {isExternalImport ? (
+                    <Text c="dimmed" size="sm">
+                        {t('create-node-step-1-connection.external-import-description')}
+                    </Text>
+                ) : (
+                    <Text c="dimmed" size="sm">
+                        {t('create-node-step-1-connection.panel-bootstrap-description')}{' '}
+                        <Anchor
+                            fw="700"
+                            href="https://docs.rw/docs/install/remnawave-node"
+                            inherit
+                            rel="noopener noreferrer"
+                            target="_blank"
+                            underline="hover"
+                        >
+                            {t('create-node-step-1-connection.learn-more')}
+                        </Anchor>
+                    </Text>
+                )}
 
                 <Divider />
                 <Stack gap="xs">

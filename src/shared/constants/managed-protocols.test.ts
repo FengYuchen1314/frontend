@@ -1,11 +1,12 @@
-import { SERVER_TYPES } from '@remnawave/backend-contract'
+import { NODE_CREATION_MODES, SERVER_TYPES } from '@remnawave/backend-contract'
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
 import {
     createManagedProtocolConfig,
     getManagedProtocolCreationPresetsForServerType,
-    isManagedProtocolCreationInboundForServerType
+    isManagedProtocolCreationInboundForServerType,
+    shouldRestrictNodeCreationToManagedProtocols
 } from './managed-protocols.ts'
 
 describe('managed protocol presets', () => {
@@ -34,12 +35,13 @@ describe('managed protocol presets', () => {
         )
     })
 
-    it('generates a password-authenticated SOCKS5 inbound without embedded users', () => {
+    it('generates a TCP-only password-authenticated SOCKS5 inbound without embedded users', () => {
         const config = createManagedProtocolConfig('socks5-password') as {
             inbounds: Array<{
                 port: number
                 protocol: string
                 settings: { auth: string; udp: boolean; users: unknown[] }
+                sniffing: { destOverride: string[]; enabled: boolean }
             }>
         }
 
@@ -49,34 +51,52 @@ describe('managed protocol presets', () => {
         assert.deepEqual(config.inbounds[0]?.settings, {
             auth: 'password',
             users: [],
-            udp: true
+            udp: false
         })
+        assert.deepEqual(config.inbounds[0]?.sniffing.destOverride, ['http', 'tls'])
     })
 
-    it('only treats password-authenticated SOCKS5 as managed on supported server types', () => {
-        const createInbound = (auth: string) =>
+    it('only treats explicitly TCP-only password SOCKS5 as managed on supported server types', () => {
+        const createInbound = (auth: string, udp?: boolean) =>
             ({
                 type: 'socks',
-                rawInbound: { protocol: 'socks', settings: { auth } }
+                rawInbound: {
+                    protocol: 'socks',
+                    settings: { auth, ...(udp === undefined ? {} : { udp }) }
+                }
             }) as never
 
         assert.equal(
             isManagedProtocolCreationInboundForServerType(
-                createInbound('password'),
+                createInbound('password', false),
                 SERVER_TYPES.BROADBAND_LANDING
             ),
             true
         )
         assert.equal(
             isManagedProtocolCreationInboundForServerType(
-                createInbound('noauth'),
+                createInbound('password', true),
                 SERVER_TYPES.BROADBAND_LANDING
             ),
             false
         )
         assert.equal(
             isManagedProtocolCreationInboundForServerType(
-                createInbound('password'),
+                createInbound('password', undefined),
+                SERVER_TYPES.BROADBAND_LANDING
+            ),
+            false
+        )
+        assert.equal(
+            isManagedProtocolCreationInboundForServerType(
+                createInbound('noauth', false),
+                SERVER_TYPES.BROADBAND_LANDING
+            ),
+            false
+        )
+        assert.equal(
+            isManagedProtocolCreationInboundForServerType(
+                createInbound('password', false),
                 SERVER_TYPES.PUBLIC_DIRECT
             ),
             true
@@ -86,6 +106,17 @@ describe('managed protocol presets', () => {
                 { type: 'socks', rawInbound: { settings: { auth: 'password' } } } as never,
                 SERVER_TYPES.PUBLIC_DIRECT
             ),
+            false
+        )
+    })
+
+    it('restricts only managed creation while external import can select existing inbounds', () => {
+        assert.equal(
+            shouldRestrictNodeCreationToManagedProtocols(NODE_CREATION_MODES.MANAGED),
+            true
+        )
+        assert.equal(
+            shouldRestrictNodeCreationToManagedProtocols(NODE_CREATION_MODES.EXTERNAL_IMPORT),
             false
         )
     })

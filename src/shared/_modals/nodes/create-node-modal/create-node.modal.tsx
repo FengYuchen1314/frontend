@@ -1,10 +1,15 @@
 import NiceModal, { useModal } from '@ebay/nice-modal-react'
 import { Group, Modal, Progress, Stack, Transition } from '@mantine/core'
 import { useForm, schemaResolver } from '@mantine/form'
-import { CreateNodeCommand, SERVER_TYPES } from '@remnawave/backend-contract'
+import {
+    CreateNodeCommand,
+    NODE_CREATION_MODES,
+    SERVER_TYPES,
+    TNodeCreationMode
+} from '@remnawave/backend-contract'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { TbCpu } from 'react-icons/tb'
+import { TbCpu, TbFileImport } from 'react-icons/tb'
 
 import { useNiceMantineModal } from '@shared/_modals/use-nice-modal'
 import { queryClient } from '@shared/api'
@@ -15,8 +20,14 @@ import { CreateNodeStep1Connection } from './create-node-steps/create-node-step-
 import { CreateNodeStep2ConfigProfiles } from './create-node-steps/create-node-step-2-config-profiles'
 import { CreateNodeStep3Status } from './create-node-steps/create-node-step-3-status'
 
-export const CreateNodeModal = NiceModal.create(() => {
+interface IProps {
+    creationMode: TNodeCreationMode
+}
+
+export const CreateNodeModal = NiceModal.create((props: IProps) => {
+    const { creationMode } = props
     const { t } = useTranslation()
+    const isExternalImport = creationMode === NODE_CREATION_MODES.EXTERNAL_IMPORT
 
     const modal = useModal()
     const { modalProps, hide } = useNiceMantineModal({
@@ -33,6 +44,9 @@ export const CreateNodeModal = NiceModal.create(() => {
     const form = useForm<CreateNodeCommand.RequestBody>({
         name: 'create-node-form',
         mode: 'uncontrolled',
+        initialValues: {
+            creationMode
+        } as CreateNodeCommand.RequestBody,
         validate: schemaResolver(CreateNodeCommand.RequestBodySchema)
     })
 
@@ -85,9 +99,13 @@ export const CreateNodeModal = NiceModal.create(() => {
             title={
                 <BaseOverlayHeader
                     iconColor="teal"
-                    IconComponent={TbCpu}
+                    IconComponent={isExternalImport ? TbFileImport : TbCpu}
                     iconVariant="soft"
-                    title={t('create-node-modal.widget.create-node')}
+                    title={t(
+                        isExternalImport
+                            ? 'create-node-modal.widget.import-external-node'
+                            : 'create-node-modal.widget.create-node'
+                    )}
                 />
             }
         >
@@ -131,7 +149,11 @@ export const CreateNodeModal = NiceModal.create(() => {
                 >
                     {(styles) => (
                         <div style={styles}>
-                            <CreateNodeStep1Connection form={form} onNext={nextStep} />
+                            <CreateNodeStep1Connection
+                                creationMode={creationMode}
+                                form={form}
+                                onNext={nextStep}
+                            />
                         </div>
                     )}
                 </Transition>
@@ -146,6 +168,7 @@ export const CreateNodeModal = NiceModal.create(() => {
                     {(styles) => (
                         <div style={styles}>
                             <CreateNodeStep2ConfigProfiles
+                                creationMode={creationMode}
                                 form={form}
                                 isCreating={isCreateNodePending}
                                 onCreateNode={handleCreateNode}

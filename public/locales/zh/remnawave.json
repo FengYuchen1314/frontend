@@ -209,6 +209,8 @@
     "feature": {
       "restart-all-nodes": "重启所有节点",
       "search-nodes": "搜索节点",
+      "create-managed-node": "创建面板托管节点",
+      "import-external-node": "导入外部 Node Agent",
       "force-restart-description": "将保证所有节点完全重启 Xray 核心。",
       "graceful-restart-description-1": "重启所有节点上的 Xray。 但如果节点哈希与当前的哈希相同，则请求可能无法实现。 这是默认的选项。",
       "force": "强制执行",
@@ -244,12 +246,15 @@
   "create-node-modal": {
     "widget": {
       "create-node": "创建节点",
+      "import-external-node": "导入外部节点",
       "back": "后退",
       "connection-successful": "连接成功",
       "connection-failed": "连接失败",
       "open-node": "打开节点",
+      "external-import-title": "导入外部 Agent",
+      "external-import-description": "这里会显示全部现有入站，包括隐藏或旧协议。目标服务器必须已经运行兼容 Remnawave 的 Node Agent；此处不能导入任意代理链接。",
       "socks5-warning-title": "SOCKS5 不提供加密",
-      "socks5-warning-description": "请在国内入口路由器或 NAT 上，将所选 TCP/UDP 端口转发到本服务器的 IX 端口。SOCKS5 的账号密码和流量均为明文，请同时配置访问控制或可信加密隧道。",
+      "socks5-warning-description": "请在国内入口路由器或 NAT 上，将所选 TCP 端口转发到本服务器的 IX 端口；UDP 转发已禁用。SOCKS5 的账号密码和流量均为明文，请同时配置访问控制或可信加密隧道。",
       "socks5-public-direct-warning-title": "公网直连极度不推荐使用 SOCKS5",
       "socks5-public-direct-warning-description": "SOCKS5 的账号密码和流量均为明文。只有在您清楚暴露风险并已配置网络层保护时才应选择它。",
       "mieru-unavailable-title": "Mieru 尚未接通",
@@ -1099,7 +1104,8 @@
     "learn-more": "了解更多。",
     "domain-or-ip": "域名或IP",
     "additional-options": "附加参数",
-    "panel-bootstrap-description": "先选择服务器类型和端口，再生成下方的一次性安装命令；节点会直接从本面板获取部署文件。"
+    "panel-bootstrap-description": "先选择服务器类型和端口，再生成下方的一次性安装命令；节点会直接从本面板获取部署文件。",
+    "external-import-description": "请输入一台已经运行兼容 Remnawave Node Agent 的服务器连接信息。此流程不能导入任意 SOCKS、VLESS 或订阅链接。"
   },
   "create-node-step-3-status": {
     "establishing-mtls-connection": "正在建立mTLS连接...",

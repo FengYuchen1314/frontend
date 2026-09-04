@@ -1,6 +1,8 @@
 import {
+    NODE_CREATION_MODES,
     SERVER_TYPES,
     type GetConfigProfilesCommand,
+    type TNodeCreationMode,
     type TServerType
 } from '@remnawave/backend-contract'
 import { encodeURLSafe } from '@stablelib/base64'
@@ -32,6 +34,9 @@ export const MANAGED_PROTOCOL_CREATION_WHITELIST = [
 
 export type ManagedProtocolCreationPresetId =
     (typeof MANAGED_PROTOCOL_CREATION_WHITELIST)[number]['id']
+
+export const shouldRestrictNodeCreationToManagedProtocols = (mode: TNodeCreationMode) =>
+    mode !== NODE_CREATION_MODES.EXTERNAL_IMPORT
 
 export const DEFAULT_MANAGED_PROTOCOL_CREATION_PRESET: ManagedProtocolCreationPresetId =
     'vless-reality-vision'
@@ -74,7 +79,9 @@ export const getManagedProtocolCreationPreset = (inbound: ConfigProfileInbound) 
 
     if (protocol === 'socks') {
         const settings = asRecord(rawInbound?.settings)
-        return settings?.auth === 'password' ? MANAGED_PROTOCOL_CREATION_WHITELIST[2] : null
+        return settings?.auth === 'password' && settings.udp === false
+            ? MANAGED_PROTOCOL_CREATION_WHITELIST[2]
+            : null
     }
 
     if (protocol !== 'vless') return null
@@ -140,11 +147,11 @@ export const createManagedProtocolConfig = (
                     settings: {
                         auth: 'password',
                         users: [],
-                        udp: true
+                        udp: false
                     },
                     sniffing: {
                         enabled: true,
-                        destOverride: ['http', 'tls', 'quic']
+                        destOverride: ['http', 'tls']
                     }
                 }
             ],

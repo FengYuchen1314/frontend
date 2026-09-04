@@ -1,11 +1,13 @@
 import { ActionIcon, ActionIconGroup, Group, Stack, Tooltip } from '@mantine/core'
 import { modals } from '@mantine/modals'
 import { spotlight } from '@mantine/spotlight'
+import { NODE_CREATION_MODES } from '@remnawave/backend-contract'
 import { useTranslation } from 'react-i18next'
 import { PiSpiral } from 'react-icons/pi'
 import {
     TbAlertCircle,
     TbCards,
+    TbFileImport,
     TbPlus,
     TbPlugConnected,
     TbRefresh,
@@ -184,14 +186,38 @@ export const NodesHeaderActionButtonsFeature = (props: IProps) => {
                 </Tooltip>
             </ActionIconGroup>
             <ActionIconGroup>
-                <Tooltip label={t('common.action.create')} withArrow>
+                <Tooltip
+                    label={t('nodes-header-action-buttons.feature.create-managed-node')}
+                    withArrow
+                >
                     <ActionIcon
                         color="teal"
-                        onClick={() => showModal('nodes_createNodeModal')}
+                        onClick={() =>
+                            showModal('nodes_createNodeModal', {
+                                creationMode: NODE_CREATION_MODES.MANAGED
+                            })
+                        }
                         size="input-md"
                         variant="soft"
                     >
                         <TbPlus size="24px" />
+                    </ActionIcon>
+                </Tooltip>
+                <Tooltip
+                    label={t('nodes-header-action-buttons.feature.import-external-node')}
+                    withArrow
+                >
+                    <ActionIcon
+                        color="cyan"
+                        onClick={() =>
+                            showModal('nodes_createNodeModal', {
+                                creationMode: NODE_CREATION_MODES.EXTERNAL_IMPORT
+                            })
+                        }
+                        size="input-md"
+                        variant="soft"
+                    >
+                        <TbFileImport size="24px" />
                     </ActionIcon>
                 </Tooltip>
             </ActionIconGroup>
