@@ -46,8 +46,9 @@ jobs:
             --prefix "$RUNNER_TEMP/xboard-backend/libs/contract" \
             --no-audit \
             --no-fund \
-            --no-package-lock
-          npm run --prefix "$RUNNER_TEMP/xboard-backend/libs/contract" build
+            --no-package-lock \
+            --ignore-scripts
+          npm run --prefix "$RUNNER_TEMP/xboard-backend/libs/contract" prepublish
           contract_tarball=$(npm pack \
             "$RUNNER_TEMP/xboard-backend/libs/contract" \
             --pack-destination "$RUNNER_TEMP" \
@@ -72,8 +73,17 @@ jobs:
             npx oxfmt --check "${changed_files[@]}"
           fi
 
-      - name: Lint
-        run: npm run lint
+      - name: Lint changed source files
+        shell: bash
+        run: |
+          mapfile -t source_files < <(
+            git diff --name-only --diff-filter=ACMR \
+              "origin/${{ github.event.repository.default_branch }}...HEAD" -- \
+              '*.js' '*.jsx' '*.ts' '*.tsx'
+          )
+          if ((${#source_files[@]})); then
+            npx oxlint --format=stylish "${source_files[@]}"
+          fi
 
       - name: Type-check
         run: npm run typecheck

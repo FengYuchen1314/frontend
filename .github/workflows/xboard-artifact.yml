@@ -42,8 +42,9 @@ jobs:
             --prefix "$RUNNER_TEMP/xboard-backend/libs/contract" \
             --no-audit \
             --no-fund \
-            --no-package-lock
-          npm run --prefix "$RUNNER_TEMP/xboard-backend/libs/contract" build
+            --no-package-lock \
+            --ignore-scripts
+          npm run --prefix "$RUNNER_TEMP/xboard-backend/libs/contract" prepublish
           contract_tarball=$(npm pack \
             "$RUNNER_TEMP/xboard-backend/libs/contract" \
             --pack-destination "$RUNNER_TEMP" \
