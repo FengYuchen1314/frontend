@@ -161,8 +161,9 @@ jobs:
           latest_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/xboard-dev" --jq .sha)"
           [[ "$latest_sha" == "$GITHUB_SHA" ]]
 
-          if ! gh release view xboard-dev-build >/dev/null 2>&1; then
+          if ! gh release view xboard-dev-build --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release create xboard-dev-build \
+              --repo "$GITHUB_REPOSITORY" \
               --prerelease \
               --target "$GITHUB_SHA" \
               --title "Xboard development build" \
@@ -176,11 +177,11 @@ jobs:
           if [[ -n "$remote_digest" ]]; then
             [[ "$remote_digest" == "$local_digest" ]]
           else
-            gh release upload xboard-dev-build "$ASSET_NAME"
+            gh release upload xboard-dev-build "$ASSET_NAME" --repo "$GITHUB_REPOSITORY"
           fi
 
           cp "$ASSET_NAME" remnawave-frontend.zip
-          gh release upload xboard-dev-build remnawave-frontend.zip --clobber
+          gh release upload xboard-dev-build remnawave-frontend.zip --clobber --repo "$GITHUB_REPOSITORY"
 
       - name: Request backend image rebuild
         if: env.GH_TOKEN != ''
