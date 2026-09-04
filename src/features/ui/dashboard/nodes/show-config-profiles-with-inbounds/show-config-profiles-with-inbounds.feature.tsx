@@ -14,6 +14,7 @@ export function ShowConfigProfilesWithInboundsFeature(props: IProps) {
         activeConfigProfileInbounds,
         activeConfigProfileUuid,
         configProfiles,
+        managedProtocolCreationOnly,
         onSaveInbounds,
         errors
     } = props
@@ -70,6 +71,7 @@ export function ShowConfigProfilesWithInboundsFeature(props: IProps) {
                                                 activeConfigProfileInbounds:
                                                     activeConfigProfileInbounds,
                                                 activeConfigProfileUuid: activeConfigProfileUuid,
+                                                managedProtocolCreationOnly,
                                                 onSaveInbounds: onSaveInbounds
                                             })
                                         }
@@ -130,6 +132,7 @@ export function ShowConfigProfilesWithInboundsFeature(props: IProps) {
                                 showModal('nodes_nodesConfigProfilesDrawer', {
                                     activeConfigProfileInbounds: [],
                                     activeConfigProfileUuid: undefined,
+                                    managedProtocolCreationOnly,
                                     onSaveInbounds: onSaveInbounds
                                 })
                             }

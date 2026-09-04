@@ -7,7 +7,8 @@ import {
     GetNodesStatisticsCommand,
     GetRecapCommand,
     GetRemnawaveHealthCommand,
-    GetStatsCommand
+    GetStatsCommand,
+    GetUpdateStatusCommand
 } from '@remnawave/backend-contract'
 import { keepPreviousData } from '@tanstack/react-query'
 
@@ -41,6 +42,9 @@ export const systemQueryKeys = createQueryKeys('system', {
         queryKey: null
     },
     getHttpStats: {
+        queryKey: null
+    },
+    getUpdateStatus: {
         queryKey: null
     }
 })
@@ -150,4 +154,15 @@ export const useGetHttpStats = createGetQueryHook({
         refetchOnMount: true
     },
     errorHandler: (error) => errorHandler(error, 'Get Http Stats')
+})
+
+export const useGetUpdateStatus = createGetQueryHook({
+    endpoint: GetUpdateStatusCommand.TSQ_url,
+    responseSchema: GetUpdateStatusCommand.ResponseSchema,
+    getQueryKey: () => systemQueryKeys.getUpdateStatus.queryKey,
+    rQueryParams: {
+        refetchOnMount: true,
+        retry: false,
+        staleTime: sToMs(10)
+    }
 })

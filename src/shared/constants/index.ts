@@ -1,5 +1,6 @@
 export * from './forms'
 export * from './interfaces'
+export * from './managed-protocols'
 export * from './monaco-theme'
 export * from './routes'
 export * from './theme'

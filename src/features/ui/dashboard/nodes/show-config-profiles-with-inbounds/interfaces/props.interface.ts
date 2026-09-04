@@ -6,5 +6,6 @@ export interface IProps {
     activeConfigProfileUuid: null | string | undefined
     configProfiles: GetConfigProfilesCommand.Response['response']['configProfiles']
     errors?: ReactNode
+    managedProtocolCreationOnly?: boolean
     onSaveInbounds: (inbounds: string[], configProfileUuid: string) => void
 }

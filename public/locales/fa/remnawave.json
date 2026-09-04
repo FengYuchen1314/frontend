@@ -384,6 +384,11 @@
   "base-node-form": {
     "country": "کشور",
     "select-country": "انتخاب کشور",
+    "server-type": "نوع سرور",
+    "server-type-description": "نوع این سرور را مشخص کنید تا پروتکل‌ها و راهنمایی‌های مرتبط نمایش داده شوند.",
+    "server-type-public-direct": "اتصال مستقیم به اینترنت عمومی",
+    "server-type-leased-line": "خط اختصاصی",
+    "server-type-broadband-landing": "خروجی پهن‌باند خانگی",
     "internal-name": "نام داخلی",
     "internal-name-placeholder": "برای مثال US-NY-Node-01",
     "e-g-example-com": "مثلا example.com",
@@ -936,7 +941,9 @@
       "create-a-new-config-profile-by-entering-a-name-below": "برای ایجاد پروفایل پیکربندی جدید اسم آن را وارد کنید",
       "you-can-customize-xray-config-after-creation": "کانفیگ Xray را می‌توانید بعد از ایجاد شخصی‌سازی کنید",
       "profile-name": "نام پروفایل",
-      "enter-profile-name": "نام پروفایل را وارد کنید"
+      "enter-profile-name": "نام پروفایل را وارد کنید",
+      "managed-protocol": "پیش‌تنظیم پروتکل مدیریت‌شده",
+      "managed-protocol-description": "فقط پیش‌تنظیم‌های پشتیبانی‌شده برای ایجاد پیکربندی مدیریت‌شده نمایش داده می‌شوند. پیکربندی‌های درون‌ریزی‌شده و موجود همچنان قابل ویرایش‌اند."
     }
   },
   "restart-node-button": {
@@ -1076,7 +1083,8 @@
   },
   "copy-docker-compose": {
     "widget": {
-      "copy-docker-compose-yml": "کپی کردن docker-compose.yml"
+      "copy-docker-compose-yml": "ایجاد و کپی فرمان نصب امن",
+      "install-command-expiry": "این فرمان فقط یک‌بار قابل استفاده است و تا {{minutes}} دقیقه دیگر (ساعت {{time}}) منقضی می‌شود."
     }
   },
   "create-node-step-1-connection": {
@@ -1084,7 +1092,8 @@
     "content-for-the-remnawave-node-below": "زیر را برای نود کپی کنید.",
     "learn-more": "اطلاعات بیشتر.",
     "domain-or-ip": "دامنه یا آیپی",
-    "additional-options": "تنظیمات بیشتر"
+    "additional-options": "تنظیمات بیشتر",
+    "panel-bootstrap-description": "نوع سرور و پورت را انتخاب کنید، سپس فرمان نصب یک‌بارمصرف را ایجاد کنید. نود فایل‌های استقرار را مستقیماً از این پنل دریافت می‌کند."
   },
   "create-node-step-3-status": {
     "establishing-mtls-connection": "درحال برقراری اتصال mTLS",
@@ -1803,6 +1812,36 @@
     "apply-description": "Affected nodes receive the new configuration right away.",
     "later": "Not now",
     "later-description": "Changes are saved, but nodes keep the current version until their next sync or restart."
+  },
+  "build-info": {
+    "updater": {
+      "title": "به‌روزرسانی پنل",
+      "checking": "در حال بررسی",
+      "state-unconfigured": "پیکربندی‌نشده",
+      "state-unreachable": "غیرقابل دسترس",
+      "state-idle": "آماده",
+      "state-updating": "در حال به‌روزرسانی",
+      "state-succeeded": "موفق",
+      "state-failed": "ناموفق",
+      "check-status": "بررسی وضعیت",
+      "update-now": "اکنون به‌روزرسانی کنید",
+      "unconfigured": "به‌روزرسانی یک‌کلیکی در دسترس نیست، زیرا سرویس به‌روزرسانی پیکربندی نشده است.",
+      "unreachable": "امکان اتصال به سرویس به‌روزرسانی پیکربندی‌شده وجود ندارد.",
+      "updating": "یک عملیات به‌روزرسانی در حال انجام است.",
+      "succeeded": "آخرین عملیات به‌روزرسانی با موفقیت به پایان رسید.",
+      "failed": "سرویس به‌روزرسانی گزارش داد که عملیات ناموفق بوده است.",
+      "no-update": "در حال حاضر هیچ به‌روزرسانی‌ای در کانال xboard-dev موجود نیست.",
+      "update-available": "نسخهٔ {{version}} در کانال xboard-dev برای به‌روزرسانی موجود است.",
+      "status-request-failed": "بررسی وضعیت سرویس به‌روزرسانی امکان‌پذیر نبود.",
+      "confirm-title": "به‌روزرسانی پنل آغاز شود؟",
+      "confirm-description": "آیا می‌خواهید استقرار کانال {{channel}} را درخواست کنید؟ ممکن است پنل راه‌اندازی مجدد شود و موقتاً در دسترس نباشد.",
+      "confirm": "شروع به‌روزرسانی",
+      "request-accepted-title": "درخواست به‌روزرسانی ثبت شد",
+      "request-accepted-message": "سرویس به‌روزرسانی درخواست را پذیرفت. برای مشاهدهٔ روند پیشرفت، وضعیت را همین‌جا بررسی کنید.",
+      "request-rejected-title": "به‌روزرسانی آغاز نشد",
+      "request-rejected-message": "سرویس به‌روزرسانی درخواست را نپذیرفت.",
+      "request-failed-title": "درخواست به‌روزرسانی ناموفق بود"
+    }
   },
   "node-geocheck": {
     "title": "GeoCheck",

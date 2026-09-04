@@ -18,6 +18,7 @@ import { Virtuoso } from 'react-virtuoso'
 
 import { useNiceMantineModal } from '@shared/_modals/use-nice-modal'
 import { useGetConfigProfiles } from '@shared/api/hooks'
+import { isManagedProtocolCreationInbound } from '@shared/constants'
 import { ConfigProfileCardShared } from '@shared/ui/config-profiles/config-profile-card/config-profile-card.shared'
 import { XrayLogo } from '@shared/ui/logos'
 import { BaseOverlayHeader } from '@shared/ui/overlays/base-overlay-header'
@@ -27,11 +28,17 @@ import classes from './nodes-config-profiles.module.css'
 interface IProps {
     activeConfigProfileInbounds: null | string[] | undefined
     activeConfigProfileUuid: null | string | undefined
+    managedProtocolCreationOnly?: boolean
     onSaveInbounds: (inbounds: string[], configProfileUuid: string) => void
 }
 
 export const NodesConfigProfilesDrawer = NiceModal.create((props: IProps) => {
-    const { activeConfigProfileInbounds = [], activeConfigProfileUuid, onSaveInbounds } = props
+    const {
+        activeConfigProfileInbounds = [],
+        activeConfigProfileUuid,
+        managedProtocolCreationOnly = false,
+        onSaveInbounds
+    } = props
     const { t } = useTranslation()
 
     const modal = useModal()
@@ -65,12 +72,19 @@ export const NodesConfigProfilesDrawer = NiceModal.create((props: IProps) => {
     const filteredProfiles = useMemo(() => {
         if (!configProfiles || !configProfiles.configProfiles) return []
 
-        if (!debouncedSearchQuery.trim()) {
-            return configProfiles.configProfiles
-        }
+        const availableProfiles = managedProtocolCreationOnly
+            ? configProfiles.configProfiles
+                  .map((profile) => ({
+                      ...profile,
+                      inbounds: profile.inbounds.filter(isManagedProtocolCreationInbound)
+                  }))
+                  .filter((profile) => profile.inbounds.length > 0)
+            : configProfiles.configProfiles
+
+        if (!debouncedSearchQuery.trim()) return availableProfiles
 
         const query = debouncedSearchQuery.toLowerCase()
-        return configProfiles.configProfiles
+        return availableProfiles
             .filter((profile) => {
                 if (profile.name.toLowerCase().includes(query)) return true
                 return profile.inbounds.some(
@@ -88,7 +102,7 @@ export const NodesConfigProfilesDrawer = NiceModal.create((props: IProps) => {
                         inbound.type.toLowerCase().includes(query)
                 )
             }))
-    }, [configProfiles, debouncedSearchQuery])
+    }, [configProfiles, debouncedSearchQuery, managedProtocolCreationOnly])
 
     const handleInboundToggle = useCallback(
         (
@@ -187,8 +201,7 @@ export const NodesConfigProfilesDrawer = NiceModal.create((props: IProps) => {
                                     <Text fw={700} size="sm">
                                         {filteredProfiles.find(
                                             (p) => p.uuid === selectedProfileUuid
-                                        )?.name ||
-                                            t('common.message.no-profile-selected')}
+                                        )?.name || t('common.message.no-profile-selected')}
                                     </Text>
                                     <Text c="dimmed" size="xs">
                                         {t('internal-squads.drawer.widget.selected-inbounds', {
@@ -240,6 +253,14 @@ export const NodesConfigProfilesDrawer = NiceModal.create((props: IProps) => {
                     placeholder={t('common.message.search-profiles-or-inbounds')}
                     value={searchQuery}
                 />
+
+                {managedProtocolCreationOnly && (
+                    <Text c="dimmed" size="xs">
+                        {t(
+                            'config-profiles-header-action-buttons.feature.managed-protocol-description'
+                        )}
+                    </Text>
+                )}
 
                 {filteredProfiles.length === 0 ? (
                     <Text c="dimmed" py="xl" size="sm" ta="center">

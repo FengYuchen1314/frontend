@@ -384,6 +384,11 @@
   "base-node-form": {
     "country": "Страна",
     "select-country": "Выберите страну",
+    "server-type": "Тип сервера",
+    "server-type-description": "Укажите тип подключения сервера — по нему будут показаны подходящие протоколы и подсказки.",
+    "server-type-public-direct": "Прямое подключение через интернет",
+    "server-type-leased-line": "Выделенная линия",
+    "server-type-broadband-landing": "Выход через домашний интернет",
     "internal-name": "Внутреннее название",
     "internal-name-placeholder": "напр. US-NY-Node-01",
     "e-g-example-com": "напр. example.com",
@@ -936,7 +941,9 @@
       "create-a-new-config-profile-by-entering-a-name-below": "Введите название ниже, чтобы создать новый профиль.",
       "you-can-customize-xray-config-after-creation": "Настроить конфиг Xray можно после создания.",
       "profile-name": "Название профиля",
-      "enter-profile-name": "Введите название профиля"
+      "enter-profile-name": "Введите название профиля",
+      "managed-protocol": "Шаблон управляемого протокола",
+      "managed-protocol-description": "Здесь показаны только поддерживаемые шаблоны управляемых протоколов. Импортированные и существующие конфигурации по-прежнему можно редактировать."
     }
   },
   "restart-node-button": {
@@ -1076,7 +1083,8 @@
   },
   "copy-docker-compose": {
     "widget": {
-      "copy-docker-compose-yml": "Скопировать docker-compose.yml"
+      "copy-docker-compose-yml": "Создать и скопировать безопасную команду установки",
+      "install-command-expiry": "Команду можно использовать один раз; срок действия истечёт через {{minutes}} мин. (в {{time}})."
     }
   },
   "create-node-step-1-connection": {
@@ -1084,7 +1092,8 @@
     "content-for-the-remnawave-node-below": "для ноды Remnawave ниже.",
     "learn-more": "Подробнее.",
     "domain-or-ip": "Домен или IP",
-    "additional-options": "Дополнительные настройки"
+    "additional-options": "Дополнительные настройки",
+    "panel-bootstrap-description": "Выберите тип сервера и порт, затем создайте одноразовую команду установки. Узел загрузит файлы развёртывания непосредственно с этой панели."
   },
   "create-node-step-3-status": {
     "establishing-mtls-connection": "Устанавливаем mTLS-соединение...",
@@ -1803,6 +1812,36 @@
     "apply-description": "Затронутые ноды получат новую конфигурацию сразу.",
     "later": "Не сейчас",
     "later-description": "Изменения сохранены, но ноды останутся на текущей версии до следующей синхронизации или перезапуска."
+  },
+  "build-info": {
+    "updater": {
+      "title": "Обновление панели",
+      "checking": "Проверяем",
+      "state-unconfigured": "Не настроено",
+      "state-unreachable": "Недоступно",
+      "state-idle": "Готово",
+      "state-updating": "Обновляется",
+      "state-succeeded": "Успешно",
+      "state-failed": "Ошибка",
+      "check-status": "Проверить статус",
+      "update-now": "Обновить сейчас",
+      "unconfigured": "Обновление в один клик недоступно: сервис обновления не настроен.",
+      "unreachable": "Настроенный сервис обновления недоступен.",
+      "updating": "Сейчас выполняется обновление.",
+      "succeeded": "Последняя операция обновления успешно завершена.",
+      "failed": "Сервис обновления сообщил об ошибке.",
+      "no-update": "В канале xboard-dev сейчас нет доступных обновлений.",
+      "update-available": "В канале xboard-dev доступно обновление {{version}}.",
+      "status-request-failed": "Не удалось проверить статус сервиса обновления.",
+      "confirm-title": "Начать обновление панели?",
+      "confirm-description": "Запросить развёртывание версии из канала {{channel}}? Панель может перезапуститься и временно стать недоступной.",
+      "confirm": "Начать обновление",
+      "request-accepted-title": "Обновление запрошено",
+      "request-accepted-message": "Сервис обновления принял запрос. Ход выполнения можно отслеживать здесь.",
+      "request-rejected-title": "Обновление не запущено",
+      "request-rejected-message": "Сервис обновления отклонил запрос.",
+      "request-failed-title": "Ошибка запроса обновления"
+    }
   },
   "node-geocheck": {
     "title": "GeoCheck",

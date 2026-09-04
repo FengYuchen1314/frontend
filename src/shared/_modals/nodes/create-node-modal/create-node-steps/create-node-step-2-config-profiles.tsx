@@ -2,6 +2,7 @@ import { ShowConfigProfilesWithInboundsFeature } from '@features/ui/dashboard/no
 import { Button, Group, Skeleton, Stack } from '@mantine/core'
 import { UseFormReturnType } from '@mantine/form'
 import { CreateNodeCommand } from '@remnawave/backend-contract'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { PiArrowLeft } from 'react-icons/pi'
 import { SiSecurityscorecard } from 'react-icons/si'
@@ -30,6 +31,7 @@ export const CreateNodeStep2ConfigProfiles = ({
     port
 }: IProps) => {
     const { t } = useTranslation()
+    const [isBootstrapGenerated, setIsBootstrapGenerated] = useState(false)
 
     const { data: configProfiles, isLoading: isConfigProfilesLoading } = useGetConfigProfiles()
 
@@ -98,6 +100,7 @@ export const CreateNodeStep2ConfigProfiles = ({
                             }
                             configProfiles={configProfiles.configProfiles}
                             errors={form.errors.configProfile}
+                            managedProtocolCreationOnly
                             onSaveInbounds={saveInbounds}
                         />
                     )}
@@ -105,11 +108,16 @@ export const CreateNodeStep2ConfigProfiles = ({
             </SectionCard.Root>
 
             <Stack gap="xs" mt="auto">
-                <CopyDockerComposeWidget port={port} />
+                <CopyDockerComposeWidget
+                    key={port}
+                    onGenerated={() => setIsBootstrapGenerated(true)}
+                    port={port}
+                />
 
                 <Group justify="space-between">
                     <Button
                         color="gray"
+                        disabled={isBootstrapGenerated}
                         leftSection={<PiArrowLeft size={18} />}
                         onClick={onPrev}
                         size="md"
@@ -118,6 +126,7 @@ export const CreateNodeStep2ConfigProfiles = ({
                     </Button>
                     <Button
                         color="teal"
+                        disabled={!isBootstrapGenerated}
                         leftSection={<TbCheck size={18} />}
                         loading={isCreating}
                         onClick={handleCreateNode}

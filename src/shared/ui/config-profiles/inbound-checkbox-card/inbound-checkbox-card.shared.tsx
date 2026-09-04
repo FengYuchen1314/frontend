@@ -7,6 +7,7 @@ import { githubDarkTheme, JsonEditor } from 'json-edit-react'
 import { useTranslation } from 'react-i18next'
 import { TbCode } from 'react-icons/tb'
 
+import { getManagedProtocolCreationPreset } from '@shared/constants'
 import { BaseOverlayHeader } from '@shared/ui/overlays/base-overlay-header'
 
 import classes from './InboundCheckboxCard.module.css'
@@ -15,6 +16,7 @@ export const InboundCheckboxCardShared = (props: IProps) => {
     const { inbound, isSelected, onInboundToggle } = props
 
     const { t } = useTranslation()
+    const managedProtocolPreset = getManagedProtocolCreationPreset(inbound)
 
     const handleShowInboundJson = (
         inbound: GetConfigProfilesCommand.Response['response']['configProfiles'][number]['inbounds'][number]
@@ -65,7 +67,7 @@ export const InboundCheckboxCardShared = (props: IProps) => {
 
                 <Group gap="xs" wrap="nowrap">
                     <Badge color="gray" ff="monospace" size="xs" variant="soft">
-                        {inbound.type}
+                        {managedProtocolPreset?.badgeLabel ?? inbound.type}
                     </Badge>
                     {inbound.port && (
                         <Badge color="teal" ff="monospace" size="xs" variant="soft">

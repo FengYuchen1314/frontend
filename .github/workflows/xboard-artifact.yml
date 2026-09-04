@@ -4,10 +4,9 @@ on:
   push:
     branches:
       - xboard-dev
-  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: xboard-frontend-artifact
@@ -15,13 +14,35 @@ concurrency:
 
 jobs:
   build:
-    name: Build and publish test artifact
+    name: Validate and build test artifact
+    if: github.repository == 'FengYuchen1314/frontend' && github.ref == 'refs/heads/xboard-dev'
+    permissions:
+      contents: read
     runs-on: ubuntu-24.04
     timeout-minutes: 25
+    outputs:
+      asset_name: ${{ steps.package.outputs.asset_name }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Determine change range
+        id: changes
+        shell: bash
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          base="$BEFORE_SHA"
+          if [[ -z "$base" || "$base" =~ ^0+$ ]]; then
+            base="$(git rev-parse HEAD^ 2>/dev/null || git hash-object -t tree /dev/null)"
+          fi
+
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+          echo "head=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -33,11 +54,16 @@ jobs:
         run: npm ci --prefer-offline --no-audit --no-fund
 
       - name: Use the fork Backend contract
+        id: backend_contract
         shell: bash
         run: |
           git clone --depth 1 --branch xboard-dev \
             https://github.com/FengYuchen1314/backend.git \
             "$RUNNER_TEMP/xboard-backend"
+          contract_tree="$(git -C "$RUNNER_TEMP/xboard-backend" rev-parse HEAD:libs/contract)"
+          [[ "$contract_tree" =~ ^[a-f0-9]{40}$ ]]
+          echo "tree=$contract_tree" >> "$GITHUB_OUTPUT"
+
           npm install \
             --prefix "$RUNNER_TEMP/xboard-backend/libs/contract" \
             --no-audit \
@@ -56,6 +82,33 @@ jobs:
             --no-save \
             "$RUNNER_TEMP/$contract_tarball"
 
+      - name: Check changed-file formatting
+        shell: bash
+        run: |
+          mapfile -d '' -t changed_files < <(
+            git diff --name-only -z --diff-filter=ACMR \
+              "${{ steps.changes.outputs.base }}" \
+              "${{ steps.changes.outputs.head }}" -- \
+              '*.css' '*.js' '*.json' '*.md' \
+              '*.ts' '*.tsx' '*.yaml' '*.yml'
+          )
+          if ((${#changed_files[@]})); then
+            npx oxfmt --check "${changed_files[@]}"
+          fi
+
+      - name: Lint changed source files
+        shell: bash
+        run: |
+          mapfile -d '' -t source_files < <(
+            git diff --name-only -z --diff-filter=ACMR \
+              "${{ steps.changes.outputs.base }}" \
+              "${{ steps.changes.outputs.head }}" -- \
+              '*.js' '*.jsx' '*.ts' '*.tsx'
+          )
+          if ((${#source_files[@]})); then
+            npx oxlint --format=stylish "${source_files[@]}"
+          fi
+
       - name: Type-check
         run: npm run typecheck
 
@@ -63,18 +116,85 @@ jobs:
         run: npm run start:build
 
       - name: Create release archive
-        run: zip -r remnawave-frontend.zip ./dist
+        id: package
+        shell: bash
+        run: |
+          export TZ=UTC
+          asset_name="remnawave-frontend-${GITHUB_SHA}-${{ steps.backend_contract.outputs.tree }}.zip"
+          source_date_epoch="$(git show -s --format=%ct "$GITHUB_SHA")"
+          find dist -exec touch -d "@$source_date_epoch" {} +
+          LC_ALL=C find dist -type f -print0 \
+            | LC_ALL=C sort -z \
+            | xargs -0 zip -X "$asset_name"
+          echo "asset_name=$asset_name" >> "$GITHUB_OUTPUT"
 
-      - name: Publish test artifact
+      - name: Store validated archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: xboard-frontend-${{ github.sha }}
+          path: ${{ steps.package.outputs.asset_name }}
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish validated test artifact
+    if: github.repository == 'FengYuchen1314/frontend' && github.ref == 'refs/heads/xboard-dev'
+    needs: build
+    permissions:
+      contents: write
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Download validated archive
+        uses: actions/download-artifact@v4
+        with:
+          name: xboard-frontend-${{ github.sha }}
+
+      - name: Publish immutable and compatibility assets
         env:
+          ASSET_NAME: ${{ needs.build.outputs.asset_name }}
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
+          latest_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/xboard-dev" --jq .sha)"
+          [[ "$latest_sha" == "$GITHUB_SHA" ]]
+
           if ! gh release view xboard-dev-build >/dev/null 2>&1; then
             gh release create xboard-dev-build \
               --prerelease \
               --target "$GITHUB_SHA" \
               --title "Xboard development build" \
-              --notes "Mutable test artifact built from the xboard-dev branch."
+              --notes "Validated test artifacts built from the xboard-dev branch."
           fi
+
+          local_digest="$(sha256sum "$ASSET_NAME" | cut -d ' ' -f 1)"
+          release_json="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/xboard-dev-build")"
+          remote_digest="$(jq -r --arg name "$ASSET_NAME" '.assets[] | select(.name == $name) | .digest | sub("^sha256:"; "")' <<<"$release_json")"
+
+          if [[ -n "$remote_digest" ]]; then
+            [[ "$remote_digest" == "$local_digest" ]]
+          else
+            gh release upload xboard-dev-build "$ASSET_NAME"
+          fi
+
+          cp "$ASSET_NAME" remnawave-frontend.zip
           gh release upload xboard-dev-build remnawave-frontend.zip --clobber
+
+      - name: Request backend image rebuild
+        if: env.GH_TOKEN != ''
+        env:
+          GH_TOKEN: ${{ secrets.XBOARD_BACKEND_ACTIONS_TOKEN }}
+        shell: bash
+        run: |
+          run_id="$(gh run list \
+            --repo FengYuchen1314/backend \
+            --workflow xboard-image.yml \
+            --branch xboard-dev \
+            --status completed \
+            --limit 1 \
+            --json databaseId \
+            --jq '.[0].databaseId')"
+          [[ "$run_id" =~ ^[0-9]+$ ]]
+          gh run rerun "$run_id" --repo FengYuchen1314/backend

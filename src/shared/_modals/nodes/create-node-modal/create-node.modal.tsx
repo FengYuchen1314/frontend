@@ -8,12 +8,7 @@ import { TbCpu } from 'react-icons/tb'
 
 import { useNiceMantineModal } from '@shared/_modals/use-nice-modal'
 import { queryClient } from '@shared/api'
-import {
-    configProfilesQueryKeys,
-    QueryKeys,
-    useCreateNode,
-    useGetNodeSecretKey
-} from '@shared/api/hooks'
+import { configProfilesQueryKeys, QueryKeys, useCreateNode } from '@shared/api/hooks'
 import { BaseOverlayHeader } from '@shared/ui/overlays/base-overlay-header'
 
 import { CreateNodeStep1Connection } from './create-node-steps/create-node-step-1-connection'
@@ -30,8 +25,6 @@ export const CreateNodeModal = NiceModal.create(() => {
             queryClient.refetchQueries({ queryKey: QueryKeys.nodes.getAllNodes.queryKey })
         }
     })
-
-    const { data: secretKey } = useGetNodeSecretKey()
 
     const [activeStep, setActiveStep] = useState(0)
     const [createdNodeUuid, setCreatedNodeUuid] = useState<string>()
@@ -138,12 +131,7 @@ export const CreateNodeModal = NiceModal.create(() => {
                 >
                     {(styles) => (
                         <div style={styles}>
-                            <CreateNodeStep1Connection
-                                form={form}
-                                onNext={nextStep}
-                                port={selectedPort}
-                                secretKey={secretKey?.secretKey}
-                            />
+                            <CreateNodeStep1Connection form={form} onNext={nextStep} />
                         </div>
                     )}
                 </Transition>

@@ -385,7 +385,7 @@
     "country": "Country",
     "select-country": "Select country",
     "server-type": "Server type",
-    "server-type-description": "Choose the server role before copying the Agent installation command.",
+    "server-type-description": "Classify this server so applicable protocols and guidance can be shown.",
     "server-type-public-direct": "Public direct",
     "server-type-leased-line": "Leased line",
     "server-type-broadband-landing": "Home broadband landing",
@@ -941,7 +941,9 @@
       "create-a-new-config-profile-by-entering-a-name-below": "Create a new config profile by entering a name below.",
       "you-can-customize-xray-config-after-creation": "You can customize the Xray config after creation.",
       "profile-name": "Profile name",
-      "enter-profile-name": "Enter profile name"
+      "enter-profile-name": "Enter profile name",
+      "managed-protocol": "Managed protocol preset",
+      "managed-protocol-description": "Only supported managed creation presets are shown. Imported and existing configurations remain editable."
     }
   },
   "restart-node-button": {
@@ -1081,7 +1083,8 @@
   },
   "copy-docker-compose": {
     "widget": {
-      "copy-docker-compose-yml": "Copy docker-compose.yml"
+      "copy-docker-compose-yml": "Generate and copy secure install command",
+      "install-command-expiry": "This command can be used once and expires in {{minutes}} minutes (at {{time}})."
     }
   },
   "create-node-step-1-connection": {
@@ -1089,7 +1092,8 @@
     "content-for-the-remnawave-node-below": "content for the Remnawave Node below.",
     "learn-more": "Learn more.",
     "domain-or-ip": "Domain or IP",
-    "additional-options": "Additional options"
+    "additional-options": "Additional options",
+    "panel-bootstrap-description": "Choose the server type and port, then generate the one-time install command below. The Node downloads its deployment files directly from this panel."
   },
   "create-node-step-3-status": {
     "establishing-mtls-connection": "Establishing mTLS connection...",
@@ -1808,6 +1812,36 @@
     "apply-description": "Affected nodes receive the new configuration right away.",
     "later": "Not now",
     "later-description": "Changes are saved, but nodes keep the current version until their next sync or restart."
+  },
+  "build-info": {
+    "updater": {
+      "title": "Panel updater",
+      "checking": "Checking",
+      "state-unconfigured": "Not configured",
+      "state-unreachable": "Unreachable",
+      "state-idle": "Ready",
+      "state-updating": "Updating",
+      "state-succeeded": "Succeeded",
+      "state-failed": "Failed",
+      "check-status": "Check status",
+      "update-now": "Update now",
+      "unconfigured": "One-click update is unavailable because the updater service is not configured.",
+      "unreachable": "The configured updater service cannot be reached.",
+      "updating": "An update is currently in progress.",
+      "succeeded": "The last updater operation completed successfully.",
+      "failed": "The updater reported a failure.",
+      "no-update": "No update is currently available on the xboard-dev channel.",
+      "update-available": "Update {{version}} is available on the xboard-dev channel.",
+      "status-request-failed": "The updater status could not be checked.",
+      "confirm-title": "Start panel update?",
+      "confirm-description": "Request deployment of the {{channel}} channel? The panel may restart and be temporarily unavailable.",
+      "confirm": "Start update",
+      "request-accepted-title": "Update requested",
+      "request-accepted-message": "The updater accepted the request. Check the status here for progress.",
+      "request-rejected-title": "Update not started",
+      "request-rejected-message": "The updater did not accept the request.",
+      "request-failed-title": "Update request failed"
+    }
   },
   "node-geocheck": {
     "title": "GeoCheck",

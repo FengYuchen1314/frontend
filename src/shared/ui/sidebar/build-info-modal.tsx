@@ -1,5 +1,6 @@
 import {
     ActionIcon,
+    Alert,
     Badge,
     Box,
     Button,
@@ -12,8 +13,12 @@ import {
     Text,
     Tooltip
 } from '@mantine/core'
+import { modals } from '@mantine/modals'
+import { notifications } from '@mantine/notifications'
 import { GetMetadataCommand } from '@remnawave/backend-contract'
+import { useTranslation } from 'react-i18next'
 import {
+    TbAlertCircle,
     TbBrandGithub,
     TbBrandTelegram,
     TbCalendar,
@@ -21,10 +26,13 @@ import {
     TbCopy,
     TbGitBranch,
     TbHash,
+    TbRefresh,
+    TbRocket,
     TbServer,
     TbWorld
 } from 'react-icons/tb'
 
+import { useGetUpdateStatus, useTriggerUpdate } from '@shared/api/hooks'
 import { formatTimeUtil } from '@shared/utils/time-utils'
 
 import { CopyableCodeBlock } from '../copyable-code-block'
@@ -37,6 +45,131 @@ interface BuildInfoModalProps {
 }
 
 export function BuildInfoModal({ remnawaveMetadata, isNewVersionAvailable }: BuildInfoModalProps) {
+    const { t } = useTranslation()
+    const {
+        data: updaterStatus,
+        error: updaterStatusError,
+        isFetching: isCheckingUpdater,
+        refetch: refetchUpdaterStatus
+    } = useGetUpdateStatus()
+    const { mutate: triggerUpdate, isPending: isTriggeringUpdate } = useTriggerUpdate({
+        mutationFns: {
+            onSuccess: (result) => {
+                if (result.accepted) {
+                    notifications.show({
+                        color: 'teal',
+                        title: t('build-info.updater.request-accepted-title'),
+                        message: t('build-info.updater.request-accepted-message')
+                    })
+                } else {
+                    notifications.show({
+                        color: 'yellow',
+                        title: t('build-info.updater.request-rejected-title'),
+                        message: result.message ?? t('build-info.updater.request-rejected-message')
+                    })
+                }
+
+                void refetchUpdaterStatus()
+            },
+            onError: (error) => {
+                notifications.show({
+                    color: 'red',
+                    title: t('build-info.updater.request-failed-title'),
+                    message: error.message
+                })
+            }
+        }
+    })
+
+    const canTriggerUpdate =
+        !updaterStatusError &&
+        !isCheckingUpdater &&
+        updaterStatus?.configured === true &&
+        updaterStatus.reachable &&
+        updaterStatus.updateAvailable === true &&
+        updaterStatus.state !== 'UPDATING'
+
+    const updaterStatusMessage = (() => {
+        if (updaterStatusError) return t('build-info.updater.status-request-failed')
+        if (!updaterStatus) return t('build-info.updater.checking')
+
+        switch (updaterStatus.state) {
+            case 'UNCONFIGURED':
+                return t('build-info.updater.unconfigured')
+            case 'UNREACHABLE':
+                return t('build-info.updater.unreachable')
+            case 'UPDATING':
+                return t('build-info.updater.updating')
+            case 'FAILED':
+                return t('build-info.updater.failed')
+        }
+
+        if (updaterStatus.updateAvailable) {
+            return t('build-info.updater.update-available', {
+                version: updaterStatus.targetVersion ?? t('common.message.not-set')
+            })
+        }
+
+        return updaterStatus.state === 'SUCCEEDED'
+            ? t('build-info.updater.succeeded')
+            : t('build-info.updater.no-update')
+    })()
+
+    const updaterStatusLabel = (() => {
+        switch (updaterStatus?.state) {
+            case 'UNCONFIGURED':
+                return t('build-info.updater.state-unconfigured')
+            case 'UNREACHABLE':
+                return t('build-info.updater.state-unreachable')
+            case 'IDLE':
+                return t('build-info.updater.state-idle')
+            case 'UPDATING':
+                return t('build-info.updater.state-updating')
+            case 'SUCCEEDED':
+                return t('build-info.updater.state-succeeded')
+            case 'FAILED':
+                return t('build-info.updater.state-failed')
+            default:
+                return t('build-info.updater.checking')
+        }
+    })()
+
+    const updaterStatusColor = (() => {
+        switch (updaterStatus?.state) {
+            case 'SUCCEEDED':
+                return 'teal'
+            case 'UPDATING':
+                return 'blue'
+            case 'FAILED':
+            case 'UNREACHABLE':
+                return 'red'
+            case 'UNCONFIGURED':
+                return 'gray'
+            default:
+                return updaterStatus?.updateAvailable ? 'yellow' : 'cyan'
+        }
+    })()
+
+    const handleTriggerUpdate = () => {
+        modals.openConfirmModal({
+            centered: true,
+            title: t('build-info.updater.confirm-title'),
+            children: (
+                <Text size="sm">
+                    {t('build-info.updater.confirm-description', {
+                        channel: updaterStatus?.channel ?? 'xboard-dev'
+                    })}
+                </Text>
+            ),
+            labels: {
+                confirm: t('build-info.updater.confirm'),
+                cancel: t('common.action.cancel')
+            },
+            confirmProps: { color: 'teal' },
+            onConfirm: () => triggerUpdate({})
+        })
+    }
+
     return (
         <Stack gap="md">
             {isNewVersionAvailable && (
@@ -72,6 +205,59 @@ export function BuildInfoModal({ remnawaveMetadata, isNewVersionAvailable }: Bui
                     </Group>
                 </Paper>
             )}
+
+            <Paper className={classes.updaterCard} p="md" radius="md">
+                <Stack gap="sm">
+                    <Group justify="space-between" wrap="wrap">
+                        <Group gap="xs">
+                            <TbRocket color="var(--mantine-color-teal-5)" size={18} />
+                            <Text fw={600} size="sm">
+                                {t('build-info.updater.title')}
+                            </Text>
+                        </Group>
+                        <Badge color={updaterStatusColor} variant="light">
+                            {updaterStatusLabel}
+                        </Badge>
+                    </Group>
+
+                    <Text c="dimmed" size="xs">
+                        {updaterStatusMessage}
+                    </Text>
+
+                    {updaterStatus?.lastError && (
+                        <Alert
+                            color="red"
+                            icon={<TbAlertCircle size={16} />}
+                            p="xs"
+                            variant="light"
+                        >
+                            {updaterStatus.lastError}
+                        </Alert>
+                    )}
+
+                    <Group grow>
+                        <Button
+                            leftSection={<TbRefresh size={15} />}
+                            loading={isCheckingUpdater}
+                            onClick={() => void refetchUpdaterStatus()}
+                            size="xs"
+                            variant="light"
+                        >
+                            {t('build-info.updater.check-status')}
+                        </Button>
+                        <Button
+                            color="teal"
+                            disabled={!canTriggerUpdate}
+                            leftSection={<TbRocket size={15} />}
+                            loading={isTriggeringUpdate}
+                            onClick={handleTriggerUpdate}
+                            size="xs"
+                        >
+                            {t('build-info.updater.update-now')}
+                        </Button>
+                    </Group>
+                </Stack>
+            </Paper>
 
             <Paper className={classes.mainCard} p="md">
                 <Stack gap="md">
@@ -226,7 +412,7 @@ export function BuildInfoModal({ remnawaveMetadata, isNewVersionAvailable }: Bui
                 </Button>
                 <Button
                     component="a"
-                    href="https://github.com/remnawave"
+                    href="https://github.com/FengYuchen1314"
                     leftSection={<TbBrandGithub size={16} />}
                     radius="md"
                     size="sm"

@@ -385,7 +385,7 @@
     "country": "国家",
     "select-country": "选择国家",
     "server-type": "服务器类型",
-    "server-type-description": "请先选择服务器用途，再复制 Agent 安装命令。",
+    "server-type-description": "标记服务器的接入类型，用于显示适用协议和操作提示。",
     "server-type-public-direct": "公网直连",
     "server-type-leased-line": "专线",
     "server-type-broadband-landing": "家宽落地",
@@ -941,7 +941,9 @@
       "create-a-new-config-profile-by-entering-a-name-below": "在下方输入名称以创建新的配置文件。",
       "you-can-customize-xray-config-after-creation": "创建后，您可以自定义 Xray 配置。",
       "profile-name": "配置文件名称",
-      "enter-profile-name": "输入配置文件名称"
+      "enter-profile-name": "输入配置文件名称",
+      "managed-protocol": "受管协议模板",
+      "managed-protocol-description": "此处仅显示已支持的受管创建模板；导入的配置和现有配置仍可继续编辑。"
     }
   },
   "restart-node-button": {
@@ -1081,7 +1083,8 @@
   },
   "copy-docker-compose": {
     "widget": {
-      "copy-docker-compose-yml": "复制 docker-compose.yml"
+      "copy-docker-compose-yml": "生成并复制安全安装命令",
+      "install-command-expiry": "此命令仅可使用一次，并将在 {{minutes}} 分钟后（{{time}}）失效。"
     }
   },
   "create-node-step-1-connection": {
@@ -1089,7 +1092,8 @@
     "content-for-the-remnawave-node-below": "以下是 Remnawave 节点的内容。",
     "learn-more": "了解更多。",
     "domain-or-ip": "域名或IP",
-    "additional-options": "附加参数"
+    "additional-options": "附加参数",
+    "panel-bootstrap-description": "先选择服务器类型和端口，再生成下方的一次性安装命令；节点会直接从本面板获取部署文件。"
   },
   "create-node-step-3-status": {
     "establishing-mtls-connection": "正在建立mTLS连接...",
@@ -1808,6 +1812,36 @@
     "apply-description": "受影响的节点立即收到新的配置。",
     "later": "以后再说",
     "later-description": "更改已保存，但节点保留当前版本，直到下次同步或重新启动。"
+  },
+  "build-info": {
+    "updater": {
+      "title": "面板更新",
+      "checking": "正在检查",
+      "state-unconfigured": "未配置",
+      "state-unreachable": "无法连接",
+      "state-idle": "就绪",
+      "state-updating": "正在更新",
+      "state-succeeded": "已成功",
+      "state-failed": "失败",
+      "check-status": "检查状态",
+      "update-now": "一键更新",
+      "unconfigured": "尚未配置更新服务，当前无法使用一键更新。",
+      "unreachable": "无法连接已配置的更新服务。",
+      "updating": "更新正在进行中。",
+      "succeeded": "上一次更新操作已成功完成。",
+      "failed": "更新服务报告操作失败。",
+      "no-update": "xboard-dev 通道当前没有可用更新。",
+      "update-available": "xboard-dev 通道有可用更新：{{version}}。",
+      "status-request-failed": "无法检查更新服务状态。",
+      "confirm-title": "开始更新面板？",
+      "confirm-description": "确定请求部署 {{channel}} 通道吗？更新期间面板可能重启并暂时不可用。",
+      "confirm": "开始更新",
+      "request-accepted-title": "已请求更新",
+      "request-accepted-message": "更新服务已接受请求，可在此处继续检查进度。",
+      "request-rejected-title": "未开始更新",
+      "request-rejected-message": "更新服务未接受本次请求。",
+      "request-failed-title": "更新请求失败"
+    }
   },
   "node-geocheck": {
     "title": "地理检测",

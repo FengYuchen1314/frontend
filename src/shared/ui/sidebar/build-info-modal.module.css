@@ -16,6 +16,11 @@
     flex: 1;
 }
 
+.updaterCard {
+    background: rgba(20, 184, 166, 0.05);
+    border: 1px solid rgba(20, 184, 166, 0.16);
+}
+
 .mainCard {
     background: linear-gradient(
         135deg,

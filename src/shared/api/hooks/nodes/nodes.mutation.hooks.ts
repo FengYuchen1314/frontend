@@ -3,6 +3,7 @@ import {
     BulkNodesActionsCommand,
     BulkNodesProfileModificationCommand,
     BulkNodesUpdateCommand,
+    CreateNodeBootstrapCommand,
     CreateNodeCommand,
     DeleteNodeCommand,
     DisableNodeCommand,
@@ -15,6 +16,23 @@ import {
 } from '@remnawave/backend-contract'
 
 import { createMutationHook } from '../../tsq-helpers'
+
+export const useCreateNodeBootstrap = createMutationHook({
+    endpoint: CreateNodeBootstrapCommand.TSQ_url,
+    bodySchema: CreateNodeBootstrapCommand.RequestBodySchema,
+    responseSchema: CreateNodeBootstrapCommand.ResponseSchema,
+    requestMethod: CreateNodeBootstrapCommand.endpointDetails.REQUEST_METHOD,
+    rMutationParams: {
+        onError: (error) => {
+            notifications.show({
+                title: 'Create Node Install Command',
+                message:
+                    error instanceof Error ? error.message : 'Request failed with unknown error.',
+                color: 'red'
+            })
+        }
+    }
+})
 
 export const useCreateNode = createMutationHook({
     endpoint: CreateNodeCommand.TSQ_url,
