@@ -25,6 +25,7 @@ import { SubpageConfigEditorPageConnector } from '@pages/dashboard/subpage-confi
 import { SubscriptionSettingsConnector } from '@pages/dashboard/subscription-settings/connectors'
 import { TemplateBasePageConnector } from '@pages/dashboard/templates/ui/connectors/template-base-page.connector'
 import { TemplateEditorPageConnector } from '@pages/dashboard/templates/ui/connectors/template-editor-page.connector'
+import { TopologyPageConnector } from '@pages/dashboard/topology'
 import { TorrentBlockerReportsPageConnector } from '@pages/dashboard/torrent-blocker-reports/ui/connectors'
 import { UsersPageConnector } from '@pages/dashboard/users/ui/connectors'
 import { NotFoundPageComponent } from '@pages/errors/4xx-error'
@@ -74,6 +75,10 @@ const router = createBrowserRouter(
                         <Route
                             element={<HostsPageConnector />}
                             path={ROUTES.DASHBOARD.MANAGEMENT.HOSTS}
+                        />
+                        <Route
+                            element={<TopologyPageConnector />}
+                            path={ROUTES.DASHBOARD.MANAGEMENT.TOPOLOGY}
                         />
                         <Route
                             element={<NodesPageConnector />}

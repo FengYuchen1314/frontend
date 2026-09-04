@@ -1,0 +1,88 @@
+.palette {
+    min-width: 0;
+}
+
+.paletteItem {
+    cursor: default;
+    transition:
+        border-color 120ms ease,
+        opacity 120ms ease;
+}
+
+.paletteItem:focus-within {
+    border-color: var(--mantine-primary-color-filled);
+}
+
+.resourceText {
+    min-width: 0;
+}
+
+.canvas {
+    min-height: 310px;
+    overflow-x: auto;
+    padding: var(--mantine-spacing-sm);
+    border: 1px dashed var(--mantine-color-default-border);
+    border-radius: var(--mantine-radius-md);
+    background:
+        linear-gradient(90deg, var(--mantine-color-default-border) 1px, transparent 1px),
+        linear-gradient(var(--mantine-color-default-border) 1px, transparent 1px);
+    background-size: 24px 24px;
+}
+
+.canvas[data-drop-target] {
+    border-color: var(--mantine-primary-color-filled);
+    background-color: var(--mantine-primary-color-light);
+}
+
+.canvas:focus-visible {
+    outline: 2px solid var(--mantine-primary-color-filled);
+    outline-offset: 2px;
+}
+
+.canvasRail {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--mantine-spacing-md);
+    min-width: max-content;
+    padding-bottom: var(--mantine-spacing-md);
+}
+
+.canvasNode {
+    width: 250px;
+    min-height: 210px;
+    flex: 0 0 250px;
+    background-color: var(--mantine-color-body);
+    transition:
+        border-color 120ms ease,
+        box-shadow 120ms ease,
+        opacity 120ms ease;
+}
+
+.targetSelect {
+    min-width: 0;
+    flex: 1;
+}
+
+.memberDropZone {
+    border-style: dashed;
+    transition:
+        border-color 120ms ease,
+        background-color 120ms ease;
+}
+
+.memberDropZone[data-drop-target] {
+    border-color: var(--mantine-primary-color-filled);
+    background-color: var(--mantine-primary-color-light);
+}
+
+@media (max-width: 48em) {
+    .canvas {
+        min-height: 260px;
+        padding: var(--mantine-spacing-xs);
+    }
+
+    .canvasNode {
+        width: min(78vw, 250px);
+        flex-basis: min(78vw, 250px);
+    }
+}

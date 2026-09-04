@@ -132,6 +132,12 @@ export const useDesktopMenuSections = (): MenuItem[] => {
                         id: 'hosts'
                     },
                     {
+                        name: t('constants.topology'),
+                        href: ROUTES.DASHBOARD.MANAGEMENT.TOPOLOGY,
+                        icon: TbCirclesRelation,
+                        id: 'topology'
+                    },
+                    {
                         name: t('constants.templates'),
                         href: ROUTES.DASHBOARD.TEMPLATES.ROOT,
                         icon: TbFolder,

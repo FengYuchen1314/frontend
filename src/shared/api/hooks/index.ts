@@ -61,5 +61,7 @@ export * from './subscription-template/subscription-template.query.hooks'
 export * from './system/system.query.hooks'
 export * from './system/system.mutation.hooks'
 
+export * from './topology'
+
 export * from './users/users.mutation.hooks'
 export * from './users/users.query.hooks'

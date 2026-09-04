@@ -26,7 +26,184 @@
     "tb-reports": "Torrent 屏蔽报告",
     "sessions-explorer": "会话管理器",
     "http-stats": "HTTP 状态",
-    "quick-launcher": "开始菜单"
+    "quick-launcher": "开始菜单",
+    "topology": "流量编排"
+  },
+  "topology": {
+    "title": "流量编排",
+    "description": "跨服务器组合链式代理和负载均衡，并预览订阅输出。",
+    "actions": {
+      "drag-to-canvas": "拖到画布",
+      "drag-resource": "把 {{name}} 拖到画布",
+      "add-to-canvas": "添加到画布",
+      "add-resource": "把 {{name}} 添加到画布",
+      "move-left": "向左移动",
+      "move-node-left": "把 {{name}} 向左移动",
+      "drag-to-reorder": "拖动调整顺序",
+      "drag-node": "拖动 {{name}} 调整顺序",
+      "move-right": "向右移动",
+      "move-node-right": "把 {{name}} 向右移动",
+      "delete-node": "删除 {{name}}",
+      "connect": "连接",
+      "connect-node": "把 {{name}} 连接到选中的下一跳",
+      "delete-connection": "删除连接",
+      "new": "新建编排",
+      "preview": "预览输出",
+      "add-load-balancer": "添加负载均衡"
+    },
+    "node": {
+      "entry": "入口",
+      "exit": "出口",
+      "load-balancer-numbered": "负载均衡 {{number}}",
+      "kind": {
+        "ENTRY": "入口",
+        "PROXY": "代理节点",
+        "LOAD_BALANCER": "负载均衡",
+        "EXIT": "出口"
+      }
+    },
+    "fields": {
+      "strategy": "策略",
+      "test-url": "健康检查网址",
+      "interval": "检查间隔（秒）",
+      "next-hop": "下一跳",
+      "saved-topology": "已保存的编排",
+      "name": "编排名称"
+    },
+    "placeholders": {
+      "choose-next-hop": "选择目标",
+      "new-topology": "尚未保存的新编排",
+      "name": "例如：亚洲均衡线路"
+    },
+    "labels": {
+      "outgoing": "从这里发出的连接",
+      "member-count": "{{count}} 个成员",
+      "version": "版本 {{version}}",
+      "unsaved": "有未保存的修改",
+      "has-errors": "需要处理",
+      "locally-valid": "本地安全检查通过"
+    },
+    "strategy": {
+      "ROUND_ROBIN": "轮询",
+      "CONSISTENT_HASH": "一致性哈希",
+      "URL_TEST": "选择最快可用线路",
+      "SELECTOR": "由用户选择"
+    },
+    "canvas": {
+      "aria-label": "流量编排画布",
+      "title": "编排画布",
+      "help": "拖动卡片调整位置；在卡片中选择下一跳即可建立连接。",
+      "drop-members": "把两个或更多代理分支拖到这里"
+    },
+    "palette": {
+      "title": "可用代理",
+      "help": "每项都是实际的 Host 与服务器组合；同一 Host 位于两台服务器时会显示两次。",
+      "search": "搜索 Host 或服务器",
+      "by-host": "按 Host",
+      "by-node": "按服务器",
+      "empty": "没有匹配的 Host 与服务器组合。",
+      "components": "组件"
+    },
+    "connections": {
+      "title": "连接关系",
+      "empty": "还没有连接，请从“入口”开始选择下一跳。"
+    },
+    "validation": {
+      "title": "安全检查",
+      "server-source": "服务器确认",
+      "local-source": "浏览器检测",
+      "nodes": "项目",
+      "edges": "连接"
+    },
+    "issue": {
+      "CYCLE": "这条连接会形成有向环路。",
+      "DUPLICATE_EDGE": "这条连接已经存在。",
+      "DUPLICATE_EDGE_ID": "两条连接使用了相同的内部编号。",
+      "DUPLICATE_NODE_ID": "两个画布项目使用了相同的内部编号。",
+      "DUPLICATE_NODE_LABEL": "画布中每个项目的名称必须唯一。",
+      "DUPLICATE_PROXY_REFERENCE": "同一个 Host 与服务器组合不能重复添加。",
+      "DISCONNECTED_GRAPH": "每个项目都必须位于从入口到出口的路径上。",
+      "DIRECTED_CYCLE": "编排中存在有向环路。",
+      "EDGE_FROM_EXIT": "出口不能有传出连接。",
+      "EDGE_REFERENCE_NOT_FOUND": "连接指向了已不存在的项目。",
+      "EDGE_TO_ENTRY": "入口不能有传入连接。",
+      "EMPTY_LOAD_BALANCER": "负载均衡至少需要两个传入代理，并且只能有一个下一跳。",
+      "EMPTY_PROXY_SET": "请至少添加一个代理。",
+      "ENTRY_BRANCHES_DO_NOT_CONVERGE": "从入口出发的并行分支必须汇聚到同一个负载均衡。",
+      "ENTRY_COUNT": "编排必须恰好包含一个入口。",
+      "ENTRY_HAS_INCOMING": "入口不能有传入连接。",
+      "EXIT_COUNT": "编排必须恰好包含一个出口。",
+      "EXIT_HAS_OUTGOING": "出口不能有传出连接。",
+      "HOST_INBOUND_NOT_ACTIVE_ON_NODE": "这个 Host 的入站在所选服务器上未启用。",
+      "HOST_NOT_FOUND": "引用的 Host 已不存在。",
+      "INVALID_ENTRY_DEGREE": "入口至少需要一个传出的代理分支，并且不能有传入连接。",
+      "INVALID_ENTRY_TARGET": "入口只能连接到代理分支的起点。",
+      "INVALID_ENTRY_COUNT": "编排必须恰好包含一个入口。",
+      "INVALID_EXIT_COUNT": "编排必须恰好包含一个出口。",
+      "INVALID_EXIT_DEGREE": "出口至少需要一个传入连接，并且不能有传出连接。",
+      "INVALID_LOAD_BALANCER_MEMBER": "只有代理可以作为负载均衡的传入成员。",
+      "INVALID_LOAD_BALANCER_SUCCESSOR": "负载均衡的下一跳必须是代理或出口。",
+      "INVALID_PROXY_DEGREE": "每个代理必须恰好有一个下一跳。",
+      "INVALID_PROXY_SUCCESSOR": "代理的下一跳类型无效。",
+      "LOAD_BALANCER_NEEDS_UPSTREAMS": "负载均衡至少需要两个上游连接。",
+      "MAX_DEPTH_EXCEEDED": "链路深度超过了安全上限。",
+      "MISSING_NODE": "连接指向了已不存在的项目。",
+      "PHYSICAL_NODE_NOT_FOUND": "引用的物理服务器已不存在。",
+      "PHYSICAL_SERVER_LOOP": "这条链路会绕回同一台物理服务器。",
+      "SELF_EDGE": "项目不能连接到自身。",
+      "SELF_LOOP": "项目不能连接到自身。",
+      "SELF_SERVER_CHAIN": "这条链路会绕回同一台物理服务器。",
+      "HOST_NODE_MISMATCH": "这个 Host 不属于所选服务器。",
+      "NO_ENTRY_TO_EXIT_PATH": "编排需要一条从入口到出口的完整路径。"
+    },
+    "messages": {
+      "connection-rejected": "已阻止连接",
+      "cannot-save": "无法保存编排",
+      "name-required": "请先填写名称。",
+      "fix-errors": "请先修正画布上标出的安全问题。",
+      "server-rejected": "服务器安全检查未通过",
+      "fix-server-errors": "请先处理服务器指出的项目，再保存。",
+      "saved-title": "编排已保存",
+      "saved": "最新版本已经保存。",
+      "deleted-title": "编排已删除",
+      "deleted": "已删除保存的编排。",
+      "delete-failed": "无法删除编排",
+      "load-failed": "无法加载已保存的编排",
+      "wait-for-load": "请等待所选编排加载完成。",
+      "duplicate-resource-title": "代理已经添加",
+      "duplicate-resource": "画布中已经有这个 Host 与服务器的组合。",
+      "proxy-next-hop-exists": "这个代理已经有下一跳。请先删除原连接，再把它加入负载均衡。",
+      "next-hop-exists": "这个项目已经有唯一的下一跳，请先删除原连接。"
+    },
+    "conflict": {
+      "title": "发现更新的版本",
+      "message": "你打开编排后，其他人保存了新版本。你的修改没有被静默覆盖；请先加载最新版再继续编辑。",
+      "reload": "加载最新版本"
+    },
+    "delete": {
+      "title": "删除这个编排？",
+      "message": "这会删除已保存的编排，不会在后台悄悄改写现有订阅。"
+    },
+    "discard": {
+      "title": "放弃未保存的修改？",
+      "message": "当前画布上的修改还没有保存。",
+      "confirm": "放弃修改"
+    },
+    "preview": {
+      "title": "订阅输出预览",
+      "help": "Mihomo 和 sing-box 由服务器编译。Xray JSON 与 Base64 无法安全表达这种图结构，因此会明确显示为不支持。",
+      "failed": "无法生成预览",
+      "not-ready-title": "编排还未完成",
+      "not-ready": "请至少添加一个代理并补全连接，然后再生成预览。",
+      "run-to-see": "点击“预览输出”，由服务器编译此格式。sing-box 是否支持还取决于负载均衡策略。",
+      "structured-unsupported": "此格式无法表达结构化链路或负载均衡，因此不会生成虚假的结果。",
+      "status": {
+        "READY": "可以预览",
+        "SUPPORTED": "支持",
+        "UNSUPPORTED": "不支持",
+        "ERROR": "错误"
+      }
+    }
   },
   "common": {
     "action": {

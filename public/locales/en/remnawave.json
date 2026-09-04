@@ -26,7 +26,184 @@
     "tb-reports": "Torrent Blocker Reports",
     "sessions-explorer": "Sessions Explorer",
     "http-stats": "HTTP Stats",
-    "quick-launcher": "Launcher"
+    "quick-launcher": "Launcher",
+    "topology": "Traffic topology"
+  },
+  "topology": {
+    "title": "Traffic topology",
+    "description": "Build proxy chains and load balancing across servers, then preview the subscription output.",
+    "actions": {
+      "drag-to-canvas": "Drag to the canvas",
+      "drag-resource": "Drag {{name}} to the canvas",
+      "add-to-canvas": "Add to canvas",
+      "add-resource": "Add {{name}} to the canvas",
+      "move-left": "Move left",
+      "move-node-left": "Move {{name}} left",
+      "drag-to-reorder": "Drag to reorder",
+      "drag-node": "Drag {{name}} to reorder",
+      "move-right": "Move right",
+      "move-node-right": "Move {{name}} right",
+      "delete-node": "Delete {{name}}",
+      "connect": "Connect",
+      "connect-node": "Connect {{name}} to the selected next hop",
+      "delete-connection": "Delete connection",
+      "new": "New topology",
+      "preview": "Preview output",
+      "add-load-balancer": "Add load balancer"
+    },
+    "node": {
+      "entry": "Entry",
+      "exit": "Exit",
+      "load-balancer-numbered": "Load balancer {{number}}",
+      "kind": {
+        "ENTRY": "Entry",
+        "PROXY": "Proxy",
+        "LOAD_BALANCER": "Load balancer",
+        "EXIT": "Exit"
+      }
+    },
+    "fields": {
+      "strategy": "Strategy",
+      "test-url": "Health-check URL",
+      "interval": "Check interval (seconds)",
+      "next-hop": "Next hop",
+      "saved-topology": "Saved topology",
+      "name": "Topology name"
+    },
+    "placeholders": {
+      "choose-next-hop": "Choose a destination",
+      "new-topology": "Unsaved new topology",
+      "name": "For example: Asia balanced route"
+    },
+    "labels": {
+      "outgoing": "Connections from here",
+      "member-count": "{{count}} members",
+      "version": "Version {{version}}",
+      "unsaved": "Unsaved changes",
+      "has-errors": "Needs attention",
+      "locally-valid": "No local safety errors"
+    },
+    "strategy": {
+      "ROUND_ROBIN": "Round robin",
+      "CONSISTENT_HASH": "Consistent hash",
+      "URL_TEST": "Fastest healthy route",
+      "SELECTOR": "User selection"
+    },
+    "canvas": {
+      "aria-label": "Topology editing canvas",
+      "title": "Topology canvas",
+      "help": "Drag items to arrange them. Choose a next hop on a card to draw a connection.",
+      "drop-members": "Drop two or more proxy branches here"
+    },
+    "palette": {
+      "title": "Available proxies",
+      "help": "Each item is a real Host and server pairing. The same Host on two servers appears twice.",
+      "search": "Search Hosts or servers",
+      "by-host": "By Host",
+      "by-node": "By server",
+      "empty": "No matching Host and server pairing.",
+      "components": "Components"
+    },
+    "connections": {
+      "title": "Connection map",
+      "empty": "No connections yet. Start at Entry and choose a next hop."
+    },
+    "validation": {
+      "title": "Safety checks",
+      "server-source": "Confirmed by the server",
+      "local-source": "Detected in this browser",
+      "nodes": "Items",
+      "edges": "Connections"
+    },
+    "issue": {
+      "CYCLE": "This connection creates a directed cycle.",
+      "DUPLICATE_EDGE": "This connection already exists.",
+      "DUPLICATE_EDGE_ID": "Two connections have the same internal ID.",
+      "DUPLICATE_NODE_ID": "Two canvas items have the same internal ID.",
+      "DUPLICATE_NODE_LABEL": "Canvas labels must be unique.",
+      "DUPLICATE_PROXY_REFERENCE": "The same Host and server pairing cannot be added twice.",
+      "DISCONNECTED_GRAPH": "Every item must be on a path from Entry to Exit.",
+      "DIRECTED_CYCLE": "The topology contains a directed cycle.",
+      "EDGE_FROM_EXIT": "Exit cannot have an outgoing connection.",
+      "EDGE_REFERENCE_NOT_FOUND": "A connection points to an item that no longer exists.",
+      "EDGE_TO_ENTRY": "Entry cannot have an incoming connection.",
+      "EMPTY_LOAD_BALANCER": "A load balancer needs at least two incoming proxies and exactly one next hop.",
+      "EMPTY_PROXY_SET": "Add at least one proxy to the topology.",
+      "ENTRY_BRANCHES_DO_NOT_CONVERGE": "Parallel Entry branches must converge at the same load balancer.",
+      "ENTRY_COUNT": "The topology must contain exactly one Entry.",
+      "ENTRY_HAS_INCOMING": "Entry cannot have an incoming connection.",
+      "EXIT_COUNT": "The topology must contain exactly one Exit.",
+      "EXIT_HAS_OUTGOING": "Exit cannot have an outgoing connection.",
+      "HOST_INBOUND_NOT_ACTIVE_ON_NODE": "This Host's inbound is not active on the selected server.",
+      "HOST_NOT_FOUND": "The referenced Host no longer exists.",
+      "INVALID_ENTRY_DEGREE": "Entry needs at least one outgoing proxy branch and no incoming connection.",
+      "INVALID_ENTRY_TARGET": "Entry can only connect to proxy branch roots.",
+      "INVALID_ENTRY_COUNT": "The topology must contain exactly one Entry.",
+      "INVALID_EXIT_COUNT": "The topology must contain exactly one Exit.",
+      "INVALID_EXIT_DEGREE": "Exit needs at least one incoming connection and no outgoing connection.",
+      "INVALID_LOAD_BALANCER_MEMBER": "Only proxies can be incoming load-balancer members.",
+      "INVALID_LOAD_BALANCER_SUCCESSOR": "A load balancer must continue to a proxy or Exit.",
+      "INVALID_PROXY_DEGREE": "Every proxy needs exactly one next hop.",
+      "INVALID_PROXY_SUCCESSOR": "A proxy has an invalid next hop.",
+      "LOAD_BALANCER_NEEDS_UPSTREAMS": "A load balancer needs at least two upstream connections.",
+      "MAX_DEPTH_EXCEEDED": "The chain is deeper than the supported safety limit.",
+      "MISSING_NODE": "A connection points to an item that no longer exists.",
+      "PHYSICAL_NODE_NOT_FOUND": "The referenced physical server no longer exists.",
+      "PHYSICAL_SERVER_LOOP": "This chain returns to the same physical server.",
+      "SELF_EDGE": "An item cannot connect to itself.",
+      "SELF_LOOP": "An item cannot connect to itself.",
+      "SELF_SERVER_CHAIN": "This chain returns to the same physical server.",
+      "HOST_NODE_MISMATCH": "This Host does not belong to the selected server.",
+      "NO_ENTRY_TO_EXIT_PATH": "The topology needs a complete path from Entry to Exit."
+    },
+    "messages": {
+      "connection-rejected": "Connection blocked",
+      "cannot-save": "Cannot save topology",
+      "name-required": "Enter a name first.",
+      "fix-errors": "Fix the highlighted safety errors first.",
+      "server-rejected": "Server safety check failed",
+      "fix-server-errors": "Review the items identified by the server before saving.",
+      "saved-title": "Topology saved",
+      "saved": "The latest version is now stored.",
+      "deleted-title": "Topology deleted",
+      "deleted": "The saved topology was removed.",
+      "delete-failed": "Could not delete topology",
+      "load-failed": "Could not load saved topologies",
+      "wait-for-load": "Wait for the selected topology to finish loading.",
+      "duplicate-resource-title": "Proxy already added",
+      "duplicate-resource": "This exact Host and server pairing is already on the canvas.",
+      "proxy-next-hop-exists": "This proxy already has a next hop. Delete that connection before adding it to a load balancer.",
+      "next-hop-exists": "This item already has its single next hop. Delete the existing connection first."
+    },
+    "conflict": {
+      "title": "A newer version exists",
+      "message": "Someone else saved this topology after you opened it. Your changes were not overwritten. Reload the latest version before editing again.",
+      "reload": "Reload latest version"
+    },
+    "delete": {
+      "title": "Delete this topology?",
+      "message": "This removes the saved topology. Existing subscriptions are not silently rewritten."
+    },
+    "discard": {
+      "title": "Discard unsaved changes?",
+      "message": "The changes on this canvas have not been saved.",
+      "confirm": "Discard changes"
+    },
+    "preview": {
+      "title": "Subscription output preview",
+      "help": "Mihomo and sing-box are compiled by the server. Xray JSON and Base64 cannot safely represent this graph and are reported as unsupported.",
+      "failed": "Could not compile preview",
+      "not-ready-title": "Topology is not ready",
+      "not-ready": "Add at least one proxy and a complete set of connections before requesting a preview.",
+      "run-to-see": "Run Preview output to compile this format on the server. sing-box support depends on the selected load-balancer strategy.",
+      "structured-unsupported": "This format cannot represent a structured chain or load balancer, so no fake output is generated.",
+      "status": {
+        "READY": "Ready to preview",
+        "SUPPORTED": "Supported",
+        "UNSUPPORTED": "Unsupported",
+        "ERROR": "Error"
+      }
+    }
   },
   "common": {
     "action": {
