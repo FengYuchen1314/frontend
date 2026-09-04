@@ -625,6 +625,7 @@ export function TopologyPageConnector() {
     const previewTopology = usePreviewTopology()
 
     const [name, setName] = useState('')
+    const [loadedIsPublished, setLoadedIsPublished] = useState(false)
     const [graph, setGraph] = useState<TopologyGraph>(() => createEmptyTopologyGraph())
     const [isDirty, setIsDirty] = useState(false)
     const [hasConflict, setHasConflict] = useState(false)
@@ -684,6 +685,7 @@ export function TopologyPageConnector() {
 
     const loadTopology = (topology: SubscriptionTopology) => {
         setName(topology.name)
+        setLoadedIsPublished(topology.isPublished)
         setGraph(topology.graph)
         setIsDirty(false)
         setHasConflict(false)
@@ -868,6 +870,7 @@ export function TopologyPageConnector() {
 
     const startNew = () => {
         setSelectedUuid(null)
+        setLoadedIsPublished(false)
         setName('')
         setGraph(createEmptyTopologyGraph())
         setIsDirty(false)
@@ -880,6 +883,7 @@ export function TopologyPageConnector() {
     const handleSelectTopology = (uuid: null | string) => {
         if (uuid === selectedUuid) return
         setSelectedUuid(uuid)
+        setLoadedIsPublished(false)
         setIsDirty(false)
         setHasConflict(false)
         setServerIssues([])
@@ -975,6 +979,37 @@ export function TopologyPageConnector() {
                 color: 'red',
                 title: t('topology.messages.cannot-save'),
                 message: errorMessage(error)
+            })
+        }
+    }
+
+    const handlePublication = async () => {
+        if (!selectedUuid || isDirty || hasConflict) return
+        try {
+            const revision = getTopologyMutationRevision(selectedUuid, loadedVersionRef.current)
+            const saved = await updateTopology.mutateAsync({
+                uuid: revision.uuid,
+                expectedVersion: revision.version,
+                isPublished: !loadedIsPublished
+            })
+            loadTopology(saved)
+            notifications.show({
+                color: 'teal',
+                title: t(
+                    saved.isPublished
+                        ? 'topology.publication.published'
+                        : 'topology.publication.draft'
+                ),
+                message: t('topology.publication.next-refresh')
+            })
+        } catch (error) {
+            if (isTopologyVersionConflict(error)) setHasConflict(true)
+            notifications.show({
+                color: 'red',
+                title: t('topology.messages.cannot-save'),
+                message: isTopologyVersionConflict(error)
+                    ? t('topology.conflict.message')
+                    : errorMessage(error)
             })
         }
     }
@@ -1091,6 +1126,24 @@ export function TopologyPageConnector() {
                         >
                             {t('common.action.save')}
                         </Button>
+                        <Button
+                            color={loadedIsPublished ? 'orange' : 'teal'}
+                            disabled={
+                                !selectedTopology ||
+                                isSelectedTopologyLoading ||
+                                isDirty ||
+                                hasConflict ||
+                                isSaving
+                            }
+                            onClick={handlePublication}
+                            variant="light"
+                        >
+                            {t(
+                                loadedIsPublished
+                                    ? 'topology.publication.unpublish'
+                                    : 'topology.publication.publish'
+                            )}
+                        </Button>
                     </Group>
                 }
                 description={t('topology.description')}
@@ -1109,6 +1162,22 @@ export function TopologyPageConnector() {
                                 {errorMessage(listError)}
                             </Alert>
                         )}
+                        <Alert
+                            color={loadedIsPublished ? 'teal' : 'blue'}
+                            title={t(
+                                loadedIsPublished
+                                    ? 'topology.publication.published'
+                                    : 'topology.publication.draft'
+                            )}
+                        >
+                            <Text size="sm">{t('topology.publication.help')}</Text>
+                            <Text mt="xs" size="sm">
+                                {t('topology.publication.binding')}
+                            </Text>
+                            <Text mt="xs" size="sm">
+                                {t('topology.publication.formats')}
+                            </Text>
+                        </Alert>
                         {hasConflict && (
                             <Alert
                                 color="orange"

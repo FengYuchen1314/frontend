@@ -59,6 +59,7 @@ const topologySchema = z.object({
     uuid: z.string().uuid(),
     name: z.string().min(2).max(100),
     version: z.number().int().positive(),
+    isPublished: z.boolean().default(false),
     graph: topologyGraphSchema,
     createdAt: z.string().datetime(),
     updatedAt: z.string().datetime()
@@ -176,6 +177,7 @@ export const useUpdateTopology = () => {
         }: {
             expectedVersion: number
             graph?: TopologyGraph
+            isPublished?: boolean
             name?: string
             uuid: string
         }) => {

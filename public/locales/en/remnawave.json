@@ -30,6 +30,16 @@
     "topology": "Traffic topology"
   },
   "topology": {
+    "publication": {
+      "binding": "For publication, assign each Host to exactly one server and configure its real endpoint (including any leased-line entry). Shared multi-server Host addresses cannot pin a selected server.",
+      "help": "Save the topology, then publish it as a virtual subscription node. Only users with access to every member receive it. Saving changes to a published topology updates its subscriptions on the next refresh; unpublish it first to edit a draft.",
+      "formats": "Supported output: Mihomo; sing-box chains, selector and URL-test. Unsupported protocols or strategies omit the whole topology, never a partial chain. Base64, Xray JSON, Clash and Stash do not include topologies.",
+      "publish": "Publish to subscriptions",
+      "unpublish": "Unpublish",
+      "published": "Published to subscriptions",
+      "draft": "Draft — not included in subscriptions",
+      "next-refresh": "This change takes effect when clients next refresh their subscriptions."
+    },
     "title": "Traffic topology",
     "description": "Build proxy chains and load balancing across servers, then preview the subscription output.",
     "actions": {
@@ -182,7 +192,7 @@
     },
     "delete": {
       "title": "Delete this topology?",
-      "message": "This removes the saved topology. Existing subscriptions are not silently rewritten."
+      "message": "This deletes the saved topology. If published, its virtual node will disappear when clients next refresh their subscriptions."
     },
     "discard": {
       "title": "Discard unsaved changes?",
