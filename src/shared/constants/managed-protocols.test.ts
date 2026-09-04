@@ -28,10 +28,73 @@ describe('managed protocol presets', () => {
         )
     })
 
-    it('does not expose a managed protocol for leased lines yet', () => {
+    it('limits leased lines to Mieru over TCP', () => {
         assert.deepEqual(
-            getManagedProtocolCreationPresetsForServerType(SERVER_TYPES.LEASED_LINE),
-            []
+            getManagedProtocolCreationPresetsForServerType(SERVER_TYPES.LEASED_LINE).map(
+                ({ id }) => id
+            ),
+            ['mieru-tcp']
+        )
+    })
+
+    it('generates the managed Mieru profile envelope expected by the backend', () => {
+        const config = createManagedProtocolConfig('mieru-tcp') as {
+            runtime: string
+            listeners: Array<{ tag: string; port: number; protocol: string }>
+            mtu: number
+            multiplexing: string
+            handshakeMode: string
+            userHintIsMandatory: boolean
+            metricsLoggingInterval: string
+            loggingLevel: string
+        }
+
+        assert.equal(config.runtime, 'MIERU')
+        assert.match(config.listeners[0]?.tag ?? '', /^MIERU_TCP_[a-f0-9]{16}$/)
+        assert.deepEqual(config.listeners[0], {
+            tag: config.listeners[0]?.tag,
+            port: 443,
+            protocol: 'TCP'
+        })
+        assert.equal(config.mtu, 1400)
+        assert.equal(config.multiplexing, 'MULTIPLEXING_LOW')
+        assert.equal(config.handshakeMode, 'HANDSHAKE_STANDARD')
+        assert.equal(config.userHintIsMandatory, true)
+        assert.equal(config.metricsLoggingInterval, '1m')
+        assert.equal(config.loggingLevel, 'INFO')
+    })
+
+    it('recognizes only TCP Mieru inbounds as managed leased-line inbounds', () => {
+        const createInbound = (transport: string, network?: string) =>
+            ({
+                type: 'mieru',
+                network,
+                rawInbound: {
+                    protocol: 'mieru',
+                    settings: { transport }
+                }
+            }) as never
+
+        assert.equal(
+            isManagedProtocolCreationInboundForServerType(
+                createInbound('TCP'),
+                SERVER_TYPES.LEASED_LINE
+            ),
+            true
+        )
+        assert.equal(
+            isManagedProtocolCreationInboundForServerType(
+                createInbound('UDP'),
+                SERVER_TYPES.LEASED_LINE
+            ),
+            false
+        )
+        assert.equal(
+            isManagedProtocolCreationInboundForServerType(
+                createInbound('TCP'),
+                SERVER_TYPES.PUBLIC_DIRECT
+            ),
+            false
         )
     })
 

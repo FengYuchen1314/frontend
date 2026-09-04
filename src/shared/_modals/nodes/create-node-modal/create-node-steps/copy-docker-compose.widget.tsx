@@ -1,5 +1,6 @@
 import { Button, Group, Stack, Text } from '@mantine/core'
 import { useClipboard } from '@mantine/hooks'
+import { SERVER_TYPES, type TServerType } from '@remnawave/backend-contract'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { PiCheck } from 'react-icons/pi'
@@ -11,9 +12,14 @@ import { CopyableCodeBlock } from '@shared/ui/copyable-code-block'
 interface IProps {
     onGenerated?: () => void
     port?: number
+    serverType?: TServerType
 }
 
-export const CopyDockerComposeWidget = ({ onGenerated, port }: IProps) => {
+export const CopyDockerComposeWidget = ({
+    onGenerated,
+    port,
+    serverType = SERVER_TYPES.PUBLIC_DIRECT
+}: IProps) => {
     const { t } = useTranslation()
     const clipboard = useClipboard({ timeout: 2000 })
     const { mutate: createBootstrap, isPending } = useCreateNodeBootstrap()
@@ -25,7 +31,7 @@ export const CopyDockerComposeWidget = ({ onGenerated, port }: IProps) => {
 
     const copyInstallCommand = () => {
         createBootstrap({
-            variables: { nodePort: port ?? 2222 },
+            variables: { nodePort: port ?? 2222, serverType },
             mutationFns: {
                 onSuccess: (data) => {
                     setBootstrap(data)

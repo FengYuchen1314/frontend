@@ -3,13 +3,13 @@ import type { editor } from 'monaco-editor'
 import { ConfigEditorActionsFeature } from '@features/dashboard/config-profiles/config-editor-actions'
 import { ConfigValidationFeature } from '@features/dashboard/config-profiles/config-validation'
 import { MonacoSetupFeature } from '@features/dashboard/config-profiles/monaco-setup'
-import { Box, Button, Code, Group, Loader, Paper } from '@mantine/core'
+import { Alert, Box, Button, Code, Group, Loader, Paper, Text } from '@mantine/core'
 import { modals } from '@mantine/modals'
 import { useMonaco } from '@monaco-editor/react'
 import clsx from 'clsx'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { TbAlertTriangle } from 'react-icons/tb'
+import { TbAlertTriangle, TbInfoCircle } from 'react-icons/tb'
 import { useBlocker } from 'react-router'
 
 import { usePseudoFullscreen, useViewportFillHeight } from '@shared/hooks'
@@ -27,6 +27,11 @@ export function ConfigEditorWidget(props: IProps) {
     const monaco = useMonaco()
 
     const { configProfile, isWasmCrashed, isWasmRestarting, onRestartWasm, snippets } = props
+    const isMieruConfig =
+        typeof configProfile.config === 'object' &&
+        configProfile.config !== null &&
+        !Array.isArray(configProfile.config) &&
+        (configProfile.config as Record<string, unknown>).runtime === 'MIERU'
 
     const [result, setResult] = useState('')
     const [isConfigValid, setIsConfigValid] = useState(true)
@@ -44,10 +49,10 @@ export function ConfigEditorWidget(props: IProps) {
     })
 
     useEffect(() => {
-        if (!monaco) return
+        if (!monaco || isMieruConfig) return
 
         MonacoSetupFeature.setup(i18n.language, snippets.snippets)
-    }, [i18n.language, snippets, monaco])
+    }, [i18n.language, isMieruConfig, snippets, monaco])
 
     const blocker = useBlocker(
         ({ currentLocation, nextLocation }) =>
@@ -57,11 +62,23 @@ export function ConfigEditorWidget(props: IProps) {
     const snippetMap = new Map(snippets.snippets.map((s) => [s.name, s.snippet]))
 
     useEffect(() => {
-        if (wasWasmRestarting.current && !isWasmRestarting && !isWasmCrashed && editorRef.current) {
-            ConfigValidationFeature.validate(editorRef, setResult, setIsConfigValid, snippetMap)
+        if (
+            !isMieruConfig &&
+            wasWasmRestarting.current &&
+            !isWasmRestarting &&
+            !isWasmCrashed &&
+            editorRef.current
+        ) {
+            ConfigValidationFeature.validate(
+                editorRef,
+                setResult,
+                setIsConfigValid,
+                snippetMap,
+                'XRAY'
+            )
         }
         wasWasmRestarting.current = isWasmRestarting
-    }, [isWasmRestarting, isWasmCrashed])
+    }, [isMieruConfig, isWasmRestarting, isWasmCrashed])
 
     const checkForChanges = () => {
         if (!editorRef.current) return
@@ -120,11 +137,15 @@ export function ConfigEditorWidget(props: IProps) {
         }
     }, [blocker])
 
-    const statusBar = (result || isWasmRestarting || isWasmCrashed) && (
+    const statusBar = (result || (!isMieruConfig && (isWasmRestarting || isWasmCrashed))) && (
         <EditorStatusBar
-            status={isWasmCrashed || isWasmRestarting || !isConfigValid ? 'error' : 'success'}
+            status={
+                (!isMieruConfig && (isWasmCrashed || isWasmRestarting)) || !isConfigValid
+                    ? 'error'
+                    : 'success'
+            }
         >
-            {isWasmRestarting && (
+            {!isMieruConfig && isWasmRestarting && (
                 <Group gap="xs">
                     <Loader color="orange" size="xs" />
                     <Code className={styles.statusCode} color="orange">
@@ -132,7 +153,7 @@ export function ConfigEditorWidget(props: IProps) {
                     </Code>
                 </Group>
             )}
-            {!isWasmRestarting && isWasmCrashed && (
+            {!isMieruConfig && !isWasmRestarting && isWasmCrashed && (
                 <Group gap="sm">
                     <Code className={styles.statusCode} color="red">
                         Xray Core (WASM) crashed. Validation is unavailable.
@@ -142,12 +163,23 @@ export function ConfigEditorWidget(props: IProps) {
                     </Button>
                 </Group>
             )}
-            {!isWasmRestarting && !isWasmCrashed && result}
+            {(isMieruConfig || (!isWasmRestarting && !isWasmCrashed)) && result}
         </EditorStatusBar>
     )
 
     return (
         <Box className={clsx(styles.container, isFullscreen && fullscreenClasses.overlay)}>
+            {isMieruConfig && !isFullscreen && (
+                <Alert
+                    color="blue"
+                    icon={<TbInfoCircle size={18} />}
+                    mb="sm"
+                    title={t('config-editor.widget.mieru-editor-title')}
+                    variant="light"
+                >
+                    <Text size="sm">{t('config-editor.widget.mieru-editor-description')}</Text>
+                </Alert>
+            )}
             <Paper
                 className={clsx(
                     styles.editorWrapper,
@@ -175,12 +207,13 @@ export function ConfigEditorWidget(props: IProps) {
                     defaultLanguage="json"
                     loading={<LoaderModalShared mih="100%" />}
                     onChange={() => {
-                        if (!isWasmCrashed && !isWasmRestarting) {
+                        if (isMieruConfig || (!isWasmCrashed && !isWasmRestarting)) {
                             ConfigValidationFeature.validate(
                                 editorRef,
                                 setResult,
                                 setIsConfigValid,
-                                snippetMap
+                                snippetMap,
+                                isMieruConfig ? 'MIERU' : 'XRAY'
                             )
                         }
 
@@ -195,13 +228,14 @@ export function ConfigEditorWidget(props: IProps) {
                             editorRef,
                             setResult,
                             setIsConfigValid,
-                            snippetMap
+                            snippetMap,
+                            isMieruConfig ? 'MIERU' : 'XRAY'
                         )
                     }}
                     options={{
                         stickyScroll: { enabled: false }
                     }}
-                    path="xray-config://*"
+                    path={isMieruConfig ? 'mieru-config://*' : 'xray-config://*'}
                     value={JSON.stringify(configProfile.config, null, 2)}
                 />
             </Paper>

@@ -12,14 +12,27 @@ import {
     ResetNodeTrafficCommand,
     RestartAllNodesCommand,
     RestartNodeCommand,
+    SERVER_TYPES,
     UpdateNodeCommand
 } from '@remnawave/backend-contract'
+import { z } from 'zod'
 
 import { createMutationHook } from '../../tsq-helpers'
 
+const CreateManagedNodeBootstrapRequestBodySchema =
+    CreateNodeBootstrapCommand.RequestBodySchema.extend({
+        serverType: z
+            .enum([
+                SERVER_TYPES.PUBLIC_DIRECT,
+                SERVER_TYPES.LEASED_LINE,
+                SERVER_TYPES.BROADBAND_LANDING
+            ])
+            .default(SERVER_TYPES.PUBLIC_DIRECT)
+    })
+
 export const useCreateNodeBootstrap = createMutationHook({
     endpoint: CreateNodeBootstrapCommand.TSQ_url,
-    bodySchema: CreateNodeBootstrapCommand.RequestBodySchema,
+    bodySchema: CreateManagedNodeBootstrapRequestBodySchema,
     responseSchema: CreateNodeBootstrapCommand.ResponseSchema,
     requestMethod: CreateNodeBootstrapCommand.endpointDetails.REQUEST_METHOD,
     rMutationParams: {

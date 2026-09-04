@@ -38,6 +38,11 @@ export function ConfigEditorActionsFeature(props: Props) {
         setOriginalValue
     } = props
     const { t } = useTranslation()
+    const isMieruConfig =
+        typeof configProfile.config === 'object' &&
+        configProfile.config !== null &&
+        !Array.isArray(configProfile.config) &&
+        (configProfile.config as Record<string, unknown>).runtime === 'MIERU'
 
     const isMobile = useIsMobile()
     const clipboard = useClipboard({ timeout: 500 })
@@ -284,34 +289,38 @@ export function ConfigEditorActionsFeature(props: Props) {
                             {t('config-editor-actions.feature.paste-from-clipboard')}
                         </Menu.Item>
 
-                        <Menu.Divider />
+                        {!isMieruConfig && (
+                            <>
+                                <Menu.Divider />
 
-                        <Menu.Item
-                            leftSection={<TbTools size={14} />}
-                            onClick={() => {
-                                modals.open({
-                                    title: (
-                                        <BaseOverlayHeader
-                                            iconColor="teal"
-                                            IconComponent={TbTools}
-                                            iconVariant="soft"
-                                            title={t('config-editor-actions.feature.tools')}
-                                        />
-                                    ),
-                                    centered: true,
-                                    children: <KeypairGeneratorWidget />
-                                })
-                            }}
-                        >
-                            {t('config-editor-actions.feature.generate-keypair')}
-                        </Menu.Item>
+                                <Menu.Item
+                                    leftSection={<TbTools size={14} />}
+                                    onClick={() => {
+                                        modals.open({
+                                            title: (
+                                                <BaseOverlayHeader
+                                                    iconColor="teal"
+                                                    IconComponent={TbTools}
+                                                    iconVariant="soft"
+                                                    title={t('config-editor-actions.feature.tools')}
+                                                />
+                                            ),
+                                            centered: true,
+                                            children: <KeypairGeneratorWidget />
+                                        })
+                                    }}
+                                >
+                                    {t('config-editor-actions.feature.generate-keypair')}
+                                </Menu.Item>
 
-                        <Menu.Item
-                            leftSection={<TbDownload size={14} />}
-                            onClick={openDownloadModal}
-                        >
-                            {t('common.action.load-from-github')}
-                        </Menu.Item>
+                                <Menu.Item
+                                    leftSection={<TbDownload size={14} />}
+                                    onClick={openDownloadModal}
+                                >
+                                    {t('common.action.load-from-github')}
+                                </Menu.Item>
+                            </>
+                        )}
                     </Menu.Dropdown>
                 </Menu>
 

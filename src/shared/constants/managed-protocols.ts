@@ -29,6 +29,12 @@ export const MANAGED_PROTOCOL_CREATION_WHITELIST = [
         label: 'SOCKS5',
         badgeLabel: 'SOCKS5',
         serverTypes: [SERVER_TYPES.PUBLIC_DIRECT, SERVER_TYPES.BROADBAND_LANDING]
+    },
+    {
+        id: 'mieru-tcp',
+        label: 'Mieru (TCP)',
+        badgeLabel: 'Mieru · TCP',
+        serverTypes: [SERVER_TYPES.LEASED_LINE]
     }
 ] as const
 
@@ -84,6 +90,11 @@ export const getManagedProtocolCreationPreset = (inbound: ConfigProfileInbound) 
             : null
     }
 
+    if (protocol === 'mieru') {
+        const settings = asRecord(rawInbound?.settings)
+        return settings?.transport === 'TCP' ? MANAGED_PROTOCOL_CREATION_WHITELIST[3] : null
+    }
+
     if (protocol !== 'vless') return null
 
     const streamSettings = getRawStreamSettings(inbound)
@@ -133,6 +144,25 @@ export const createManagedProtocolConfig = (
     const shortId = randomHex(8)
     const path = randomHex(8)
     const isVision = presetId === 'vless-reality-vision'
+
+    if (presetId === 'mieru-tcp') {
+        return {
+            runtime: 'MIERU',
+            listeners: [
+                {
+                    tag: `MIERU_TCP_${shortId}`,
+                    port: 443,
+                    protocol: 'TCP'
+                }
+            ],
+            mtu: 1400,
+            multiplexing: 'MULTIPLEXING_LOW',
+            handshakeMode: 'HANDSHAKE_STANDARD',
+            userHintIsMandatory: true,
+            metricsLoggingInterval: '1m',
+            loggingLevel: 'INFO'
+        }
+    }
 
     if (presetId === 'socks5-password') {
         return {

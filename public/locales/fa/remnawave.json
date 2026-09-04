@@ -222,7 +222,9 @@
       "unsaved-changes": "تغییرات ذخیره نشده",
       "your-changes-will-be-lost-if-you-leave-this-page-without-saving": "اگر این صفحه را بدون ذخیره تغییرات ترک کنید، تغییرات ایجاد شده از دست خواهند رفت.",
       "leave": "ترک",
-      "stay": "ماندن"
+      "stay": "ماندن",
+      "mieru-editor-title": "ویرایشگر پروفایل Mieru",
+      "mieru-editor-description": "این پروفایل با طرح Mieru بررسی می‌شود و هرگز به اعتبارسنج Xray WASM فرستاده نمی‌شود. پورت‌های listeners مربوط به سمت IX هستند؛ IP و پورت ورودی داخلی کاربران در Host تنظیم می‌شود."
     }
   },
   "keypair": {
@@ -257,8 +259,8 @@
       "socks5-warning-description": "در روتر یا NAT ورودی داخلی، پورت TCP انتخاب‌شده را به پورت IX این سرور هدایت کنید. انتقال UDP غیرفعال است. نام کاربری، گذرواژه و ترافیک SOCKS5 به‌صورت متن ساده منتقل می‌شوند؛ بنابراین کنترل دسترسی یا تونل رمزگذاری‌شدهٔ مورداعتماد تنظیم کنید.",
       "socks5-public-direct-warning-title": "برای سرور عمومی مستقیم به‌شدت توصیه نمی‌شود",
       "socks5-public-direct-warning-description": "نام کاربری، گذرواژه و ترافیک SOCKS5 متن ساده هستند. فقط وقتی این گزینه را انتخاب کنید که خطر افشا را می‌دانید و حفاظت شبکه‌ای مناسب دارید.",
-      "mieru-unavailable-title": "Mieru هنوز متصل نشده است",
-      "mieru-unavailable-description": "استقرار مدیریت‌شده روی خط اختصاصی به پشتیبانی Mieru نیاز دارد که در این نسخه موجود نیست. پیکربندی‌های واردشده و موجود همچنان خارج از این راهنما قابل ویرایش هستند."
+      "mieru-only-title": "خط اختصاصی فقط از Mieru پشتیبانی می‌کند",
+      "mieru-only-description": "یک پروفایل مدیریت‌شده Mieru (TCP) انتخاب کنید. فرمان نصب Agent، محیط Mita موردنیاز Mieru را نیز مستقر می‌کند."
     }
   },
   "edit-node-modal": {
@@ -329,6 +331,12 @@
     "address-description-line-2": "در بیشتر موارد، باید به یکی از نود‌های متصل اشاره کند.",
     "port-description-line-1": "پورت اتصال.",
     "port-description-line-2": "در بیشتر موارد، باید با پورت اینباند انتخاب‌شده مطابقت داشته باشد.",
+    "mieru-entry-mapping-title": "نگاشت ورودی داخلی Mieru و پورت IX",
+    "mieru-entry-mapping-description": "آدرس و پورت زیر ورودی داخلی قابل دسترس برای کاربران است. شنونده Mieru انتخاب‌شده از پورت IX شماره {{ixPort}} استفاده می‌کند. برای نگاشت یک‌به‌یک پورت {{ixPort}} را نگه دارید، یا پورت ورودی دیگری وارد و آن را به پورت IX شماره {{ixPort}} هدایت کنید.",
+    "mieru-domestic-entry-ip": "IP یا دامنه ورودی داخلی",
+    "mieru-domestic-entry-ip-description": "IP یا دامنه ورودی داخلی قابل دسترس برای کاربران را وارد کنید؛ نشانی خصوصی IX سرور خط اختصاصی را اینجا وارد نکنید.",
+    "mieru-domestic-entry-port": "پورت ورودی داخلی",
+    "mieru-domestic-entry-port-description": "برای نگاشت یک‌به‌یک از پورت IX شماره {{ixPort}} استفاده کنید. برای نگاشت دستی، پورت داخلی قابل دسترس را وارد و آن را به پورت IX شماره {{ixPort}} روی سرور خط اختصاصی هدایت کنید.",
     "sni-description-line-1": "SNI نشان‌دهنده نام سرور است.",
     "sni-description-line-2": "اگر مشخص نشود، مقدار از کانفیگ اینباند استخراج خواهد شد.",
     "host-visibility": "قابلیت دیده شدن هاست",
@@ -950,7 +958,7 @@
   "config-profiles-header-action-buttons": {
     "feature": {
       "create-a-new-config-profile-by-entering-a-name-below": "برای ایجاد پروفایل پیکربندی جدید اسم آن را وارد کنید",
-      "you-can-customize-xray-config-after-creation": "کانفیگ Xray را می‌توانید بعد از ایجاد شخصی‌سازی کنید",
+      "you-can-customize-xray-config-after-creation": "پس از ایجاد می‌توانید پیکربندی محیط اجرایی انتخاب‌شده را شخصی‌سازی کنید",
       "profile-name": "نام پروفایل",
       "enter-profile-name": "نام پروفایل را وارد کنید",
       "managed-protocol": "پیش‌تنظیم پروتکل مدیریت‌شده",

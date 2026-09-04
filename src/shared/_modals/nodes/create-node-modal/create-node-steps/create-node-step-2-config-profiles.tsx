@@ -37,11 +37,13 @@ export const CreateNodeStep2ConfigProfiles = ({
     port
 }: IProps) => {
     const { t } = useTranslation()
-    const [isBootstrapGenerated, setIsBootstrapGenerated] = useState(false)
+    const [generatedBootstrapKey, setGeneratedBootstrapKey] = useState<string>()
     const isManagedCreation = shouldRestrictNodeCreationToManagedProtocols(creationMode)
 
     const { data: configProfiles, isLoading: isConfigProfilesLoading } = useGetConfigProfiles()
     const serverType = form.getValues().serverType ?? SERVER_TYPES.PUBLIC_DIRECT
+    const bootstrapKey = `${serverType}-${port}`
+    const isBootstrapGenerated = generatedBootstrapKey === bootstrapKey
     const isBroadbandLanding = isManagedCreation && serverType === SERVER_TYPES.BROADBAND_LANDING
     const isLeasedLine = isManagedCreation && serverType === SERVER_TYPES.LEASED_LINE
     const selectedInboundUuids = new Set(form.getValues().configProfile?.activeInbounds ?? [])
@@ -141,54 +143,47 @@ export const CreateNodeStep2ConfigProfiles = ({
 
                     {!isConfigProfilesLoading && configProfiles && (
                         <>
-                            {isLeasedLine ? (
+                            {isLeasedLine && (
                                 <Alert
                                     color="blue"
                                     icon={<TbInfoCircle size={18} />}
-                                    title={t('create-node-modal.widget.mieru-unavailable-title')}
+                                    mb="md"
+                                    title={t('create-node-modal.widget.mieru-only-title')}
                                     variant="light"
                                 >
                                     <Text size="sm">
-                                        {t(
-                                            'create-node-modal.widget.mieru-unavailable-description'
-                                        )}
+                                        {t('create-node-modal.widget.mieru-only-description')}
                                     </Text>
                                 </Alert>
-                            ) : (
-                                <>
-                                    {!isManagedCreation && (
-                                        <Alert
-                                            color="blue"
-                                            icon={<TbInfoCircle size={18} />}
-                                            mb="md"
-                                            title={t(
-                                                'create-node-modal.widget.external-import-title'
-                                            )}
-                                            variant="light"
-                                        >
-                                            <Text size="sm">
-                                                {t(
-                                                    'create-node-modal.widget.external-import-description'
-                                                )}
-                                            </Text>
-                                        </Alert>
-                                    )}
-
-                                    <ShowConfigProfilesWithInboundsFeature
-                                        activeConfigProfileInbounds={
-                                            form.getValues().configProfile?.activeInbounds ?? []
-                                        }
-                                        activeConfigProfileUuid={
-                                            form.getValues().configProfile?.activeConfigProfileUuid
-                                        }
-                                        configProfiles={configProfiles.configProfiles}
-                                        errors={form.errors.configProfile}
-                                        managedProtocolCreationOnly={isManagedCreation}
-                                        onSaveInbounds={saveInbounds}
-                                        serverType={isManagedCreation ? serverType : undefined}
-                                    />
-                                </>
                             )}
+
+                            {!isManagedCreation && (
+                                <Alert
+                                    color="blue"
+                                    icon={<TbInfoCircle size={18} />}
+                                    mb="md"
+                                    title={t('create-node-modal.widget.external-import-title')}
+                                    variant="light"
+                                >
+                                    <Text size="sm">
+                                        {t('create-node-modal.widget.external-import-description')}
+                                    </Text>
+                                </Alert>
+                            )}
+
+                            <ShowConfigProfilesWithInboundsFeature
+                                activeConfigProfileInbounds={
+                                    form.getValues().configProfile?.activeInbounds ?? []
+                                }
+                                activeConfigProfileUuid={
+                                    form.getValues().configProfile?.activeConfigProfileUuid
+                                }
+                                configProfiles={configProfiles.configProfiles}
+                                errors={form.errors.configProfile}
+                                managedProtocolCreationOnly={isManagedCreation}
+                                onSaveInbounds={saveInbounds}
+                                serverType={isManagedCreation ? serverType : undefined}
+                            />
 
                             {isManagedCreation && (isBroadbandLanding || isSocksSelected) && (
                                 <Alert
@@ -217,11 +212,12 @@ export const CreateNodeStep2ConfigProfiles = ({
             </SectionCard.Root>
 
             <Stack gap="xs" mt="auto">
-                {isManagedCreation && !isLeasedLine && (
+                {isManagedCreation && (
                     <CopyDockerComposeWidget
-                        key={port}
-                        onGenerated={() => setIsBootstrapGenerated(true)}
+                        key={bootstrapKey}
+                        onGenerated={() => setGeneratedBootstrapKey(bootstrapKey)}
                         port={port}
+                        serverType={serverType}
                     />
                 )}
 
@@ -237,7 +233,7 @@ export const CreateNodeStep2ConfigProfiles = ({
                     </Button>
                     <Button
                         color="teal"
-                        disabled={isManagedCreation && (!isBootstrapGenerated || isLeasedLine)}
+                        disabled={isManagedCreation && !isBootstrapGenerated}
                         leftSection={<TbCheck size={18} />}
                         loading={isCreating}
                         onClick={handleCreateNode}

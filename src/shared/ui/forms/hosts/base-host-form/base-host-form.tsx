@@ -2,6 +2,7 @@ import { DeleteHostFeature } from '@features/ui/dashboard/hosts/delete-host'
 import { HostSelectInboundFeature } from '@features/ui/dashboard/hosts/host-select-inbound/host-select-inbound.feature'
 import {
     ActionIcon,
+    Alert,
     Button,
     Group,
     Popover,
@@ -12,6 +13,7 @@ import {
 } from '@mantine/core'
 import {
     CreateHostCommand,
+    GetConfigProfilesCommand,
     UpdateHostCommand,
     UpdateManyHostsCommand
 } from '@remnawave/backend-contract'
@@ -19,7 +21,7 @@ import { INTERNAL_SQUADS_MODE, SECURITY_LAYERS } from '@remnawave/backend-contra
 import { useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { HiQuestionMarkCircle } from 'react-icons/hi'
-import { PiFloppyDiskDuotone } from 'react-icons/pi'
+import { PiArrowsLeftRight, PiFloppyDiskDuotone } from 'react-icons/pi'
 
 import { DrawerFooter } from '@shared/ui/drawer-footer'
 import { TemplateInfoPopoverShared } from '@shared/ui/popovers'
@@ -35,6 +37,25 @@ import {
     HostOptionsSection,
     IHostFormData
 } from './options'
+
+type ConfigProfileInbound =
+    GetConfigProfilesCommand.Response['response']['configProfiles'][number]['inbounds'][number]
+
+const asRecord = (value: unknown): Record<string, unknown> | null => {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return null
+    return value as Record<string, unknown>
+}
+
+const asManagedMieruInbound = (
+    inbound: ConfigProfileInbound | undefined
+): ConfigProfileInbound | null => {
+    if (!inbound || inbound.type.toLowerCase() !== 'mieru') return null
+
+    const rawInbound = asRecord(inbound.rawInbound)
+    const settings = asRecord(rawInbound?.settings)
+
+    return rawInbound?.protocol === 'mieru' && settings?.transport === 'TCP' ? inbound : null
+}
 
 export const BaseHostForm = <
     T extends
@@ -62,6 +83,14 @@ export const BaseHostForm = <
     const [internalSquadsMode, setInternalSquadsMode] = useState(
         () => form.getValues().internalSquads?.mode
     )
+    const [selectedMieruInbound, setSelectedMieruInbound] = useState(() => {
+        const { inbound } = form.getValues()
+        const selectedInbound = configProfiles
+            ?.find((profile) => profile.uuid === inbound?.configProfileUuid)
+            ?.inbounds.find((item) => item.uuid === inbound?.configProfileInboundUuid)
+
+        return asManagedMieruInbound(selectedInbound)
+    })
 
     const watchInternalSquadsMode = useCallback(
         ({ value }: { value: unknown }) =>
@@ -118,6 +147,11 @@ export const BaseHostForm = <
     }
 
     const saveInbound = (inbound: string, configProfileUuid: string) => {
+        const selectedInbound = configProfiles
+            ?.find((profile) => profile.uuid === configProfileUuid)
+            ?.inbounds.find((item) => item.uuid === inbound)
+
+        setSelectedMieruInbound(asManagedMieruInbound(selectedInbound))
         form.setValues({
             inbound: {
                 configProfileInboundUuid: inbound,
@@ -268,6 +302,22 @@ export const BaseHostForm = <
                                         />
                                     </Stack>
 
+                                    {selectedMieruInbound && (
+                                        <Alert
+                                            color="blue"
+                                            icon={<PiArrowsLeftRight size={18} />}
+                                            title={t('base-host-form.mieru-entry-mapping-title')}
+                                            variant="light"
+                                        >
+                                            <Text size="sm">
+                                                {t(
+                                                    'base-host-form.mieru-entry-mapping-description',
+                                                    { ixPort: selectedMieruInbound.port }
+                                                )}
+                                            </Text>
+                                        </Alert>
+                                    )}
+
                                     <Group
                                         gap="xs"
                                         grow
@@ -277,19 +327,29 @@ export const BaseHostForm = <
                                     >
                                         <TextInput
                                             key={form.key('address')}
-                                            label={t('common.field.address')}
+                                            label={t(
+                                                selectedMieruInbound
+                                                    ? 'base-host-form.mieru-domestic-entry-ip'
+                                                    : 'common.field.address'
+                                            )}
                                             leftSection={
                                                 <PopoverWithInfoShared
                                                     text={
-                                                        <>
-                                                            {t(
-                                                                'base-host-form.address-description-line-1'
-                                                            )}
-                                                            <br />
-                                                            {t(
-                                                                'base-host-form.address-description-line-2'
-                                                            )}
-                                                        </>
+                                                        selectedMieruInbound ? (
+                                                            t(
+                                                                'base-host-form.mieru-domestic-entry-ip-description'
+                                                            )
+                                                        ) : (
+                                                            <>
+                                                                {t(
+                                                                    'base-host-form.address-description-line-1'
+                                                                )}
+                                                                <br />
+                                                                {t(
+                                                                    'base-host-form.address-description-line-2'
+                                                                )}
+                                                            </>
+                                                        )
                                                     }
                                                 />
                                             }
@@ -303,7 +363,11 @@ export const BaseHostForm = <
 
                                         <NumberInput
                                             key={form.key('port')}
-                                            label={t('common.field.port')}
+                                            label={t(
+                                                selectedMieruInbound
+                                                    ? 'base-host-form.mieru-domestic-entry-port'
+                                                    : 'common.field.port'
+                                            )}
                                             {...form.getInputProps('port')}
                                             allowDecimal={false}
                                             allowNegative={false}
@@ -313,16 +377,25 @@ export const BaseHostForm = <
                                             leftSection={
                                                 <PopoverWithInfoShared
                                                     text={
-                                                        <>
-                                                            {t(
-                                                                'base-host-form.port-description-line-1'
-                                                            )}
-                                                            <br />
-                                                            <br />
-                                                            {t(
-                                                                'base-host-form.port-description-line-2'
-                                                            )}
-                                                        </>
+                                                        selectedMieruInbound ? (
+                                                            t(
+                                                                'base-host-form.mieru-domestic-entry-port-description',
+                                                                {
+                                                                    ixPort: selectedMieruInbound.port
+                                                                }
+                                                            )
+                                                        ) : (
+                                                            <>
+                                                                {t(
+                                                                    'base-host-form.port-description-line-1'
+                                                                )}
+                                                                <br />
+                                                                <br />
+                                                                {t(
+                                                                    'base-host-form.port-description-line-2'
+                                                                )}
+                                                            </>
+                                                        )
                                                     }
                                                 />
                                             }

@@ -222,7 +222,9 @@
       "unsaved-changes": "修改未保存",
       "your-changes-will-be-lost-if-you-leave-this-page-without-saving": "如果您离开此页面而不保存，您的更改将会丢失。",
       "leave": "离开",
-      "stay": "留在当前页面"
+      "stay": "留在当前页面",
+      "mieru-editor-title": "Mieru 配置编辑器",
+      "mieru-editor-description": "此配置只使用 Mieru 结构校验，不会送入 Xray WASM 校验器。listeners 中的端口是 IX 侧端口；客户端使用的国内入口 IP 和端口请在 Host 中配置。"
     }
   },
   "keypair": {
@@ -257,8 +259,8 @@
       "socks5-warning-description": "请在国内入口路由器或 NAT 上，将所选 TCP 端口转发到本服务器的 IX 端口；UDP 转发已禁用。SOCKS5 的账号密码和流量均为明文，请同时配置访问控制或可信加密隧道。",
       "socks5-public-direct-warning-title": "公网直连极度不推荐使用 SOCKS5",
       "socks5-public-direct-warning-description": "SOCKS5 的账号密码和流量均为明文。只有在您清楚暴露风险并已配置网络层保护时才应选择它。",
-      "mieru-unavailable-title": "Mieru 尚未接通",
-      "mieru-unavailable-description": "专线的面板托管部署依赖 Mieru，本版本暂未提供。导入配置和已有配置仍可在此向导之外正常编辑。"
+      "mieru-only-title": "专线仅支持 Mieru",
+      "mieru-only-description": "请选择面板托管的 Mieru（TCP）配置。生成的 Agent 安装命令会同时部署 Mieru 所需的 Mita 运行时。"
     }
   },
   "edit-node-modal": {
@@ -329,6 +331,12 @@
     "address-description-line-2": "在大多数情况下，它应指向某一个在线节点。",
     "port-description-line-1": "连接端口。",
     "port-description-line-2": "在大多数情况下，必须与所选入站的端口匹配。",
+    "mieru-entry-mapping-title": "Mieru 国内入口与 IX 端口映射",
+    "mieru-entry-mapping-description": "下方地址和端口是提供给客户端的国内入口；所选 Mieru 入站的 IX 端口为 {{ixPort}}。一一对应时保持端口为 {{ixPort}}；手动映射时填写实际对外的国内入口端口，并将它转发到 IX 端口 {{ixPort}}。",
+    "mieru-domestic-entry-ip": "国内入口 IP 或域名",
+    "mieru-domestic-entry-ip-description": "填写客户端能够访问的国内入口 IP 或域名，不要在此填写专线服务器的私有 IX 地址。",
+    "mieru-domestic-entry-port": "国内入口端口",
+    "mieru-domestic-entry-port-description": "一一对应时使用 IX 端口 {{ixPort}}；手动映射时填写对外开放的国内入口端口，并在入口设备上将它转发到专线服务器的 IX 端口 {{ixPort}}。",
     "sni-description-line-1": "SNI 代表服务器名称。",
     "sni-description-line-2": "如果未指定，将使用入站配置中的值。",
     "host-visibility": "主机可见性",
@@ -950,7 +958,7 @@
   "config-profiles-header-action-buttons": {
     "feature": {
       "create-a-new-config-profile-by-entering-a-name-below": "在下方输入名称以创建新的配置文件。",
-      "you-can-customize-xray-config-after-creation": "创建后，您可以自定义 Xray 配置。",
+      "you-can-customize-xray-config-after-creation": "创建后，您可以自定义所选运行时的配置。",
       "profile-name": "配置文件名称",
       "enter-profile-name": "输入配置文件名称",
       "managed-protocol": "受管协议模板",

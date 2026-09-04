@@ -4,8 +4,64 @@ import { GetSnippetsCommand } from '@remnawave/backend-contract'
 import consola from 'consola/browser'
 import dayjs from 'dayjs'
 import { RefObject } from 'react'
+import { z } from 'zod'
 
 const PROTECTED_ROOT_KEYS = new Set(['api', 'inbounds', 'metrics', 'snippets', 'stats'])
+
+const MieruProfileConfigSchema = z
+    .object({
+        runtime: z.literal('MIERU'),
+        listeners: z
+            .array(
+                z
+                    .object({
+                        tag: z
+                            .string()
+                            .min(1)
+                            .max(64)
+                            .refine((tag) => !tag.includes(','), {
+                                message: "Character ',' is not allowed in listener tag"
+                            }),
+                        port: z.int().min(1025).max(65535),
+                        protocol: z.enum(['TCP', 'UDP'])
+                    })
+                    .strict()
+            )
+            .min(1)
+            .max(128),
+        mtu: z.int().min(1280).max(1500),
+        multiplexing: z.literal('MULTIPLEXING_LOW'),
+        handshakeMode: z.literal('HANDSHAKE_STANDARD'),
+        userHintIsMandatory: z.literal(true),
+        metricsLoggingInterval: z.literal('1m'),
+        loggingLevel: z.enum(['FATAL', 'ERROR', 'WARN', 'INFO', 'DEBUG', 'TRACE'])
+    })
+    .strict()
+    .superRefine((config, context) => {
+        const tags = new Set<string>()
+        const bindings = new Set<string>()
+
+        config.listeners.forEach((listener, index) => {
+            if (tags.has(listener.tag)) {
+                context.addIssue({
+                    code: 'custom',
+                    message: `Duplicate Mieru listener tag "${listener.tag}"`,
+                    path: ['listeners', index, 'tag']
+                })
+            }
+            tags.add(listener.tag)
+
+            const binding = `${listener.protocol}:${listener.port}`
+            if (bindings.has(binding)) {
+                context.addIssue({
+                    code: 'custom',
+                    message: `Duplicate Mieru listener binding "${binding}"`,
+                    path: ['listeners', index, 'port']
+                })
+            }
+            bindings.add(binding)
+        })
+    })
 
 const replaceSnippetsInRoot = (
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -74,7 +130,8 @@ export const ConfigValidationFeature = {
         snippetsMap: Map<
             string,
             GetSnippetsCommand.Response['response']['snippets'][number]['snippet']
-        >
+        >,
+        runtime: 'MIERU' | 'XRAY' = 'XRAY'
     ) => {
         try {
             if (!editorRef.current) return
@@ -87,6 +144,27 @@ export const ConfigValidationFeature = {
                 clonedCurrentValue = JSON.parse(currentValue)
             } catch {
                 setResult(`${dayjs().format('HH:mm:ss')} | Invalid JSON.`)
+                setIsConfigValid(false)
+                return
+            }
+
+            if (runtime === 'MIERU') {
+                const validationResult = MieruProfileConfigSchema.safeParse(clonedCurrentValue)
+
+                if (validationResult.success) {
+                    setResult(`${dayjs().format('HH:mm:ss')} | Mieru config is valid.`)
+                    setIsConfigValid(true)
+                    return
+                }
+
+                const issues = validationResult.error.issues
+                    .map((issue) => {
+                        const path = issue.path.length > 0 ? `${issue.path.join('.')}: ` : ''
+                        return `${path}${issue.message}`
+                    })
+                    .join('; ')
+
+                setResult(`${dayjs().format('HH:mm:ss')} | Invalid Mieru config: ${issues}`)
                 setIsConfigValid(false)
                 return
             }

@@ -222,7 +222,9 @@
       "unsaved-changes": "Unsaved changes",
       "your-changes-will-be-lost-if-you-leave-this-page-without-saving": "Your changes will be lost if you leave this page without saving.",
       "leave": "Leave",
-      "stay": "Stay"
+      "stay": "Stay",
+      "mieru-editor-title": "Mieru profile editor",
+      "mieru-editor-description": "This profile is checked against the Mieru schema and is never sent to the Xray WASM validator. Listener ports are IX-side ports; client-facing domestic entry IP and port are configured on the Host."
     }
   },
   "keypair": {
@@ -257,8 +259,8 @@
       "socks5-warning-description": "Forward the selected TCP port from the domestic entry router or NAT to this server's IX port. UDP relay is disabled. SOCKS5 credentials and traffic are plaintext, so add access controls or a trusted encrypted tunnel.",
       "socks5-public-direct-warning-title": "Extremely discouraged for public-direct servers",
       "socks5-public-direct-warning-description": "SOCKS5 credentials and traffic are plaintext. Select this only if you understand the exposure and have appropriate network-level protection.",
-      "mieru-unavailable-title": "Mieru is not connected yet",
-      "mieru-unavailable-description": "Managed leased-line deployment requires Mieru support, which is not available in this release. Imported and existing configurations remain editable outside this wizard."
+      "mieru-only-title": "Leased lines support Mieru only",
+      "mieru-only-description": "Select a managed Mieru (TCP) profile. The generated Agent install command also deploys the Mita runtime required by Mieru."
     }
   },
   "edit-node-modal": {
@@ -329,6 +331,12 @@
     "address-description-line-2": "In most cases, it should point to one of the connected nodes.",
     "port-description-line-1": "Connection port.",
     "port-description-line-2": "In most cases, must match the port of selected inbound.",
+    "mieru-entry-mapping-title": "Mieru domestic-entry and IX port mapping",
+    "mieru-entry-mapping-description": "Address and port below are the domestic entry exposed to clients. The selected Mieru listener uses IX port {{ixPort}}. Keep port {{ixPort}} for one-to-one mapping, or enter a different domestic entry port and configure port forwarding to IX port {{ixPort}}.",
+    "mieru-domestic-entry-ip": "Domestic entry IP or domain",
+    "mieru-domestic-entry-ip-description": "Enter the domestic entry IP or domain that clients can reach; do not enter the leased-line server's private IX address here.",
+    "mieru-domestic-entry-port": "Domestic entry port",
+    "mieru-domestic-entry-port-description": "For one-to-one mapping, use IX port {{ixPort}}. For a manual mapping, enter the exposed domestic port and forward it to IX port {{ixPort}} on the leased-line server.",
     "sni-description-line-1": "SNI stands for Server Name Indication.",
     "sni-description-line-2": "If not specified, the value from config's inbound will be used.",
     "host-visibility": "Host visibility",
@@ -950,7 +958,7 @@
   "config-profiles-header-action-buttons": {
     "feature": {
       "create-a-new-config-profile-by-entering-a-name-below": "Create a new config profile by entering a name below.",
-      "you-can-customize-xray-config-after-creation": "You can customize the Xray config after creation.",
+      "you-can-customize-xray-config-after-creation": "You can customize the selected runtime configuration after creation.",
       "profile-name": "Profile name",
       "enter-profile-name": "Enter profile name",
       "managed-protocol": "Managed protocol preset",
