@@ -16,6 +16,7 @@ import {
 import { modals } from '@mantine/modals'
 import { notifications } from '@mantine/notifications'
 import { GetMetadataCommand } from '@remnawave/backend-contract'
+import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
     TbAlertCircle,
@@ -44,18 +45,31 @@ interface BuildInfoModalProps {
     remnawaveMetadata: GetMetadataCommand.Response['response']
 }
 
+const UPDATE_STATUS_POLL_INTERVAL_MS = 2_500
+
 export function BuildInfoModal({ remnawaveMetadata, isNewVersionAvailable }: BuildInfoModalProps) {
     const { t } = useTranslation()
+    const isPollingUpdate = useRef(false)
+    const pollingBaselineUpdatedAt = useRef<string | null>(null)
+    const hasSeenRunningUpdate = useRef(false)
     const {
         data: updaterStatus,
         error: updaterStatusError,
         isFetching: isCheckingUpdater,
         refetch: refetchUpdaterStatus
-    } = useGetUpdateStatus()
+    } = useGetUpdateStatus({
+        rQueryParams: {
+            refetchInterval: UPDATE_STATUS_POLL_INTERVAL_MS,
+            refetchIntervalInBackground: true
+        }
+    })
     const { mutate: triggerUpdate, isPending: isTriggeringUpdate } = useTriggerUpdate({
         mutationFns: {
             onSuccess: (result) => {
                 if (result.accepted) {
+                    pollingBaselineUpdatedAt.current = updaterStatus?.updatedAt ?? null
+                    hasSeenRunningUpdate.current = false
+                    isPollingUpdate.current = true
                     notifications.show({
                         color: 'teal',
                         title: t('build-info.updater.request-accepted-title'),
@@ -80,6 +94,37 @@ export function BuildInfoModal({ remnawaveMetadata, isNewVersionAvailable }: Bui
             }
         }
     })
+
+    useEffect(() => {
+        if (!isPollingUpdate.current || !updaterStatus) return
+
+        if (updaterStatus.state === 'UPDATING') {
+            hasSeenRunningUpdate.current = true
+            return
+        }
+
+        const statusChanged = updaterStatus.updatedAt !== pollingBaselineUpdatedAt.current
+        if (!statusChanged && !hasSeenRunningUpdate.current) return
+
+        if (updaterStatus.state === 'SUCCEEDED') {
+            isPollingUpdate.current = false
+            notifications.show({
+                color: 'teal',
+                title: t('build-info.updater.state-succeeded'),
+                message: t('build-info.updater.succeeded')
+            })
+            globalThis.setTimeout(() => globalThis.location.reload(), 1_200)
+        }
+
+        if (updaterStatus.state === 'FAILED') {
+            isPollingUpdate.current = false
+            notifications.show({
+                color: 'red',
+                title: t('build-info.updater.state-failed'),
+                message: updaterStatus.lastError ?? t('build-info.updater.failed')
+            })
+        }
+    }, [t, updaterStatus])
 
     const canTriggerUpdate =
         !updaterStatusError &&
