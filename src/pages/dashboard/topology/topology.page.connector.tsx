@@ -381,7 +381,7 @@ function CanvasNodeCard({
                                 onUpdateLoadBalancer({
                                     ...node,
                                     strategy,
-                                    ...(strategy === 'URL_TEST'
+                                    ...(strategy !== 'SELECTOR'
                                         ? {
                                               testUrl:
                                                   node.testUrl ??
@@ -394,7 +394,7 @@ function CanvasNodeCard({
                             size="xs"
                             value={node.strategy}
                         />
-                        {node.strategy === 'URL_TEST' && (
+                        {node.strategy !== 'SELECTOR' && (
                             <>
                                 <TextInput
                                     label={t('topology.fields.test-url')}
