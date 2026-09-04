@@ -16,7 +16,8 @@ export function ShowConfigProfilesWithInboundsFeature(props: IProps) {
         configProfiles,
         managedProtocolCreationOnly,
         onSaveInbounds,
-        errors
+        errors,
+        serverType
     } = props
 
     const { t } = useTranslation()
@@ -72,7 +73,8 @@ export function ShowConfigProfilesWithInboundsFeature(props: IProps) {
                                                     activeConfigProfileInbounds,
                                                 activeConfigProfileUuid: activeConfigProfileUuid,
                                                 managedProtocolCreationOnly,
-                                                onSaveInbounds: onSaveInbounds
+                                                onSaveInbounds: onSaveInbounds,
+                                                serverType
                                             })
                                         }
                                         size="lg"
@@ -133,7 +135,8 @@ export function ShowConfigProfilesWithInboundsFeature(props: IProps) {
                                     activeConfigProfileInbounds: [],
                                     activeConfigProfileUuid: undefined,
                                     managedProtocolCreationOnly,
-                                    onSaveInbounds: onSaveInbounds
+                                    onSaveInbounds: onSaveInbounds,
+                                    serverType
                                 })
                             }
                             size="sm"

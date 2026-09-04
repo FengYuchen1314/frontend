@@ -10,7 +10,7 @@ import {
     TextInput,
     Tooltip
 } from '@mantine/core'
-import { GetConfigProfilesCommand } from '@remnawave/backend-contract'
+import { GetConfigProfilesCommand, TServerType } from '@remnawave/backend-contract'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { TbDeviceFloppy, TbSearch, TbX } from 'react-icons/tb'
@@ -18,7 +18,10 @@ import { Virtuoso } from 'react-virtuoso'
 
 import { useNiceMantineModal } from '@shared/_modals/use-nice-modal'
 import { useGetConfigProfiles } from '@shared/api/hooks'
-import { isManagedProtocolCreationInbound } from '@shared/constants'
+import {
+    isManagedProtocolCreationInbound,
+    isManagedProtocolCreationInboundForServerType
+} from '@shared/constants'
 import { ConfigProfileCardShared } from '@shared/ui/config-profiles/config-profile-card/config-profile-card.shared'
 import { XrayLogo } from '@shared/ui/logos'
 import { BaseOverlayHeader } from '@shared/ui/overlays/base-overlay-header'
@@ -30,6 +33,7 @@ interface IProps {
     activeConfigProfileUuid: null | string | undefined
     managedProtocolCreationOnly?: boolean
     onSaveInbounds: (inbounds: string[], configProfileUuid: string) => void
+    serverType?: TServerType
 }
 
 export const NodesConfigProfilesDrawer = NiceModal.create((props: IProps) => {
@@ -37,7 +41,8 @@ export const NodesConfigProfilesDrawer = NiceModal.create((props: IProps) => {
         activeConfigProfileInbounds = [],
         activeConfigProfileUuid,
         managedProtocolCreationOnly = false,
-        onSaveInbounds
+        onSaveInbounds,
+        serverType
     } = props
     const { t } = useTranslation()
 
@@ -76,7 +81,11 @@ export const NodesConfigProfilesDrawer = NiceModal.create((props: IProps) => {
             ? configProfiles.configProfiles
                   .map((profile) => ({
                       ...profile,
-                      inbounds: profile.inbounds.filter(isManagedProtocolCreationInbound)
+                      inbounds: profile.inbounds.filter((inbound) =>
+                          serverType
+                              ? isManagedProtocolCreationInboundForServerType(inbound, serverType)
+                              : isManagedProtocolCreationInbound(inbound)
+                      )
                   }))
                   .filter((profile) => profile.inbounds.length > 0)
             : configProfiles.configProfiles
@@ -102,7 +111,7 @@ export const NodesConfigProfilesDrawer = NiceModal.create((props: IProps) => {
                         inbound.type.toLowerCase().includes(query)
                 )
             }))
-    }, [configProfiles, debouncedSearchQuery, managedProtocolCreationOnly])
+    }, [configProfiles, debouncedSearchQuery, managedProtocolCreationOnly, serverType])
 
     const handleInboundToggle = useCallback(
         (

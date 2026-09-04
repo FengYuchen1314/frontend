@@ -1,5 +1,8 @@
-import type { GetConfigProfilesCommand } from '@remnawave/backend-contract'
-
+import {
+    SERVER_TYPES,
+    type GetConfigProfilesCommand,
+    type TServerType
+} from '@remnawave/backend-contract'
 import { encodeURLSafe } from '@stablelib/base64'
 import { generateKeyPair } from '@stablelib/x25519'
 
@@ -10,12 +13,20 @@ export const MANAGED_PROTOCOL_CREATION_WHITELIST = [
     {
         id: 'vless-reality-vision',
         label: 'VLESS + REALITY + Vision',
-        badgeLabel: 'VLESS · REALITY · Vision'
+        badgeLabel: 'VLESS · REALITY · Vision',
+        serverTypes: [SERVER_TYPES.PUBLIC_DIRECT]
     },
     {
         id: 'vless-xhttp-reality-xmux',
         label: 'VLESS + XHTTP + REALITY + XMUX',
-        badgeLabel: 'VLESS · XHTTP · XMUX'
+        badgeLabel: 'VLESS · XHTTP · XMUX',
+        serverTypes: [SERVER_TYPES.PUBLIC_DIRECT]
+    },
+    {
+        id: 'socks5-password',
+        label: 'SOCKS5',
+        badgeLabel: 'SOCKS5',
+        serverTypes: [SERVER_TYPES.PUBLIC_DIRECT, SERVER_TYPES.BROADBAND_LANDING]
     }
 ] as const
 
@@ -24,6 +35,11 @@ export type ManagedProtocolCreationPresetId =
 
 export const DEFAULT_MANAGED_PROTOCOL_CREATION_PRESET: ManagedProtocolCreationPresetId =
     'vless-reality-vision'
+
+export const getManagedProtocolCreationPresetsForServerType = (serverType: TServerType) =>
+    MANAGED_PROTOCOL_CREATION_WHITELIST.filter((preset) =>
+        preset.serverTypes.some((supportedServerType) => supportedServerType === serverType)
+    )
 
 const asRecord = (value: unknown): Record<string, unknown> | null => {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) return null
@@ -50,7 +66,18 @@ const hasVisionFlow = (inbound: ConfigProfileInbound) => {
 }
 
 export const getManagedProtocolCreationPreset = (inbound: ConfigProfileInbound) => {
-    if (inbound.type.toLowerCase() !== 'vless') return null
+    const protocol = inbound.type.toLowerCase()
+    const rawInbound = asRecord(inbound.rawInbound)
+    const rawProtocol = rawInbound?.protocol
+
+    if (typeof rawProtocol !== 'string' || rawProtocol.toLowerCase() !== protocol) return null
+
+    if (protocol === 'socks') {
+        const settings = asRecord(rawInbound?.settings)
+        return settings?.auth === 'password' ? MANAGED_PROTOCOL_CREATION_WHITELIST[2] : null
+    }
+
+    if (protocol !== 'vless') return null
 
     const streamSettings = getRawStreamSettings(inbound)
     const network = (inbound.network ?? streamSettings?.network)?.toString().toLowerCase()
@@ -72,6 +99,17 @@ export const getManagedProtocolCreationPreset = (inbound: ConfigProfileInbound) 
 export const isManagedProtocolCreationInbound = (inbound: ConfigProfileInbound) =>
     getManagedProtocolCreationPreset(inbound) !== null
 
+export const isManagedProtocolCreationInboundForServerType = (
+    inbound: ConfigProfileInbound,
+    serverType: TServerType
+) => {
+    const preset = getManagedProtocolCreationPreset(inbound)
+    return (
+        preset !== null &&
+        preset.serverTypes.some((supportedServerType) => supportedServerType === serverType)
+    )
+}
+
 const randomHex = (byteLength: number) => {
     const bytes = globalThis.crypto.getRandomValues(new Uint8Array(byteLength))
     return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
@@ -88,6 +126,43 @@ export const createManagedProtocolConfig = (
     const shortId = randomHex(8)
     const path = randomHex(8)
     const isVision = presetId === 'vless-reality-vision'
+
+    if (presetId === 'socks5-password') {
+        return {
+            log: {
+                loglevel: 'info'
+            },
+            inbounds: [
+                {
+                    tag: `SOCKS5_${shortId}`,
+                    port: 1080,
+                    protocol: 'socks',
+                    settings: {
+                        auth: 'password',
+                        users: [],
+                        udp: true
+                    },
+                    sniffing: {
+                        enabled: true,
+                        destOverride: ['http', 'tls', 'quic']
+                    }
+                }
+            ],
+            outbounds: [
+                {
+                    protocol: 'freedom',
+                    tag: 'DIRECT'
+                },
+                {
+                    protocol: 'blackhole',
+                    tag: 'BLOCK'
+                }
+            ],
+            routing: {
+                rules: []
+            }
+        }
+    }
 
     return {
         log: {

@@ -247,7 +247,13 @@
       "back": "后退",
       "connection-successful": "连接成功",
       "connection-failed": "连接失败",
-      "open-node": "打开节点"
+      "open-node": "打开节点",
+      "socks5-warning-title": "SOCKS5 不提供加密",
+      "socks5-warning-description": "请在国内入口路由器或 NAT 上，将所选 TCP/UDP 端口转发到本服务器的 IX 端口。SOCKS5 的账号密码和流量均为明文，请同时配置访问控制或可信加密隧道。",
+      "socks5-public-direct-warning-title": "公网直连极度不推荐使用 SOCKS5",
+      "socks5-public-direct-warning-description": "SOCKS5 的账号密码和流量均为明文。只有在您清楚暴露风险并已配置网络层保护时才应选择它。",
+      "mieru-unavailable-title": "Mieru 尚未接通",
+      "mieru-unavailable-description": "专线的面板托管部署依赖 Mieru，本版本暂未提供。导入配置和已有配置仍可在此向导之外正常编辑。"
     }
   },
   "edit-node-modal": {

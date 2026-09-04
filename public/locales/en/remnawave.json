@@ -247,7 +247,13 @@
       "back": "Back",
       "connection-successful": "Connection successful",
       "connection-failed": "Connection failed",
-      "open-node": "Open node"
+      "open-node": "Open node",
+      "socks5-warning-title": "SOCKS5 is unencrypted",
+      "socks5-warning-description": "Forward the selected TCP/UDP port from the domestic entry router or NAT to this server's IX port. SOCKS5 credentials and traffic are plaintext, so add access controls or a trusted encrypted tunnel.",
+      "socks5-public-direct-warning-title": "Extremely discouraged for public-direct servers",
+      "socks5-public-direct-warning-description": "SOCKS5 credentials and traffic are plaintext. Select this only if you understand the exposure and have appropriate network-level protection.",
+      "mieru-unavailable-title": "Mieru is not connected yet",
+      "mieru-unavailable-description": "Managed leased-line deployment requires Mieru support, which is not available in this release. Imported and existing configurations remain editable outside this wizard."
     }
   },
   "edit-node-modal": {

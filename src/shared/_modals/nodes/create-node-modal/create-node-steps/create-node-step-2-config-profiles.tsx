@@ -1,14 +1,15 @@
 import { ShowConfigProfilesWithInboundsFeature } from '@features/ui/dashboard/nodes/show-config-profiles-with-inbounds'
-import { Button, Group, Skeleton, Stack } from '@mantine/core'
+import { Alert, Button, Group, Skeleton, Stack, Text } from '@mantine/core'
 import { UseFormReturnType } from '@mantine/form'
-import { CreateNodeCommand } from '@remnawave/backend-contract'
-import { useState } from 'react'
+import { CreateNodeCommand, SERVER_TYPES } from '@remnawave/backend-contract'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { PiArrowLeft } from 'react-icons/pi'
 import { SiSecurityscorecard } from 'react-icons/si'
-import { TbCheck } from 'react-icons/tb'
+import { TbAlertTriangle, TbCheck, TbInfoCircle } from 'react-icons/tb'
 
 import { useGetConfigProfiles } from '@shared/api/hooks'
+import { isManagedProtocolCreationInboundForServerType } from '@shared/constants'
 import { BaseOverlayHeader } from '@shared/ui/overlays/base-overlay-header'
 import { SectionCard } from '@shared/ui/section-card'
 
@@ -34,6 +35,42 @@ export const CreateNodeStep2ConfigProfiles = ({
     const [isBootstrapGenerated, setIsBootstrapGenerated] = useState(false)
 
     const { data: configProfiles, isLoading: isConfigProfilesLoading } = useGetConfigProfiles()
+    const serverType = form.getValues().serverType ?? SERVER_TYPES.PUBLIC_DIRECT
+    const isBroadbandLanding = serverType === SERVER_TYPES.BROADBAND_LANDING
+    const isLeasedLine = serverType === SERVER_TYPES.LEASED_LINE
+    const selectedInboundUuids = new Set(form.getValues().configProfile?.activeInbounds ?? [])
+    const isSocksSelected = (configProfiles?.configProfiles ?? []).some((profile) =>
+        profile.inbounds.some(
+            (inbound) =>
+                selectedInboundUuids.has(inbound.uuid) && inbound.type.toLowerCase() === 'socks'
+        )
+    )
+
+    const compatibleInboundUuids = useMemo(
+        () =>
+            new Set(
+                (configProfiles?.configProfiles ?? []).flatMap((profile) =>
+                    profile.inbounds
+                        .filter((inbound) =>
+                            isManagedProtocolCreationInboundForServerType(inbound, serverType)
+                        )
+                        .map((inbound) => inbound.uuid)
+                )
+            ),
+        [configProfiles, serverType]
+    )
+
+    useEffect(() => {
+        const selectedInbounds = form.getValues().configProfile?.activeInbounds ?? []
+        if (selectedInbounds.some((uuid) => !compatibleInboundUuids.has(uuid))) {
+            form.setValues({
+                configProfile: {
+                    activeConfigProfileUuid: '',
+                    activeInbounds: []
+                }
+            })
+        }
+    }, [compatibleInboundUuids, form])
 
     const saveInbounds = (inbounds: string[], configProfileUuid: string) => {
         form.setValues({
@@ -91,28 +128,70 @@ export const CreateNodeStep2ConfigProfiles = ({
                     )}
 
                     {!isConfigProfilesLoading && configProfiles && (
-                        <ShowConfigProfilesWithInboundsFeature
-                            activeConfigProfileInbounds={
-                                form.getValues().configProfile?.activeInbounds ?? []
-                            }
-                            activeConfigProfileUuid={
-                                form.getValues().configProfile?.activeConfigProfileUuid
-                            }
-                            configProfiles={configProfiles.configProfiles}
-                            errors={form.errors.configProfile}
-                            managedProtocolCreationOnly
-                            onSaveInbounds={saveInbounds}
-                        />
+                        <>
+                            {isLeasedLine ? (
+                                <Alert
+                                    color="blue"
+                                    icon={<TbInfoCircle size={18} />}
+                                    title={t('create-node-modal.widget.mieru-unavailable-title')}
+                                    variant="light"
+                                >
+                                    <Text size="sm">
+                                        {t(
+                                            'create-node-modal.widget.mieru-unavailable-description'
+                                        )}
+                                    </Text>
+                                </Alert>
+                            ) : (
+                                <ShowConfigProfilesWithInboundsFeature
+                                    activeConfigProfileInbounds={
+                                        form.getValues().configProfile?.activeInbounds ?? []
+                                    }
+                                    activeConfigProfileUuid={
+                                        form.getValues().configProfile?.activeConfigProfileUuid
+                                    }
+                                    configProfiles={configProfiles.configProfiles}
+                                    errors={form.errors.configProfile}
+                                    managedProtocolCreationOnly
+                                    onSaveInbounds={saveInbounds}
+                                    serverType={serverType}
+                                />
+                            )}
+
+                            {(isBroadbandLanding || isSocksSelected) && (
+                                <Alert
+                                    color={isBroadbandLanding ? 'orange' : 'red'}
+                                    icon={<TbAlertTriangle size={18} />}
+                                    mt="md"
+                                    title={t(
+                                        isBroadbandLanding
+                                            ? 'create-node-modal.widget.socks5-warning-title'
+                                            : 'create-node-modal.widget.socks5-public-direct-warning-title'
+                                    )}
+                                    variant="light"
+                                >
+                                    <Text size="sm">
+                                        {t(
+                                            isBroadbandLanding
+                                                ? 'create-node-modal.widget.socks5-warning-description'
+                                                : 'create-node-modal.widget.socks5-public-direct-warning-description'
+                                        )}
+                                    </Text>
+                                </Alert>
+                            )}
+                        </>
                     )}
                 </SectionCard.Section>
             </SectionCard.Root>
 
             <Stack gap="xs" mt="auto">
-                <CopyDockerComposeWidget
-                    key={port}
-                    onGenerated={() => setIsBootstrapGenerated(true)}
-                    port={port}
-                />
+                {!isLeasedLine && (
+                    <CopyDockerComposeWidget
+                        key={port}
+                        onGenerated={() => setIsBootstrapGenerated(true)}
+                        port={port}
+                    />
+                )}
 
                 <Group justify="space-between">
                     <Button
@@ -126,7 +205,7 @@ export const CreateNodeStep2ConfigProfiles = ({
                     </Button>
                     <Button
                         color="teal"
-                        disabled={!isBootstrapGenerated}
+                        disabled={!isBootstrapGenerated || isLeasedLine}
                         leftSection={<TbCheck size={18} />}
                         loading={isCreating}
                         onClick={handleCreateNode}
