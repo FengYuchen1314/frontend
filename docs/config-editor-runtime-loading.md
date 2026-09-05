@@ -65,3 +65,34 @@ Private VPS evidence: `editor-a0-upgrade.log`, `editor-a0-preservation.json`,
 `editor-a0-before.sql`; browser observations were captured in the task tool log.
 A full repository lint rerun reported **15 errors and 11 warnings** in unrelated
 existing components; this checkpoint does not claim a clean full-repository lint.
+
+## Encrypted AnyTLS browser follow-up — 2026-09-05
+
+Frontend `1addfa954455333a236abb68d60575e6ed773540` passed
+[CI 33964516594](https://github.com/FengYuchen1314/frontend/actions/runs/33964516594)
+(42 tests, changed-file lint, type checking and build). Backend `0b5125d1` and this
+exact frontend passed
+[paired image 33964860911](https://github.com/FengYuchen1314/backend/actions/runs/33964860911):
+
+`ghcr.io/fengyuchen1314/backend@sha256:76f018cab44b52ac110e7fcd57d414362e0ab6f3825f53dbfb6546c9d729ef00`
+
+After a private DB backup, the owned browser panel was upgraded to this pair.
+The real UI created `Browser Encrypted AnyTLS` through the existing profile form:
+missing camouflage fields and colliding private ports disabled submission.
+Successful creation retained empty native Xray inbounds, a strict namespaced
+listener and no subscribers, passwords, certificates or insecure overrides.
+
+The editor loaded the real Xray WASM and reported combined structural validity.
+A whitespace edit enabled normal Save and Undo disabled it. Invalid JSON and a
+JSON-valid extension with version 9 separately blocked normal Save. These drafts
+were never saved, and Save Anyway was not used. Public-direct Node selection
+included the new TLS/443 AnyTLS/ShadowTLS inbound; leased selection exposed only
+Mieru fixtures and residential selection only SOCKS5. No Node or bootstrap
+credential was created by these selector checks.
+
+Final API deep comparison preserved every previous topology, complete profile
+and host and found exactly the one added AnyTLS profile (6 total). The source
+snapshot, SQL backup and private check logs remain in
+`/opt/xboard-panel-test.oKbMNrzT`. This checkpoint proves browser structure and
+filtering; backend `docs/anytls-managed-creation.md` separately records the real
+managed original-installer/native-client/accounting acceptance with this image.
