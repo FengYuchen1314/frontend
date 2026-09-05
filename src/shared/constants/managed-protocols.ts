@@ -151,7 +151,7 @@ export const createManagedProtocolConfig = (
             listeners: [
                 {
                     tag: `MIERU_TCP_${shortId}`,
-                    port: 443,
+                    port: 24443,
                     protocol: 'TCP'
                 }
             ],

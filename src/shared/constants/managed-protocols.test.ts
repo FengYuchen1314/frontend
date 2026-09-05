@@ -50,10 +50,14 @@ describe('managed protocol presets', () => {
         }
 
         assert.equal(config.runtime, 'MIERU')
+        assert(
+            config.listeners.every(({ port }) => port >= 1025 && port <= 65535),
+            'Generated Mieru listeners must satisfy both editor and backend unprivileged-port validation'
+        )
         assert.match(config.listeners[0]?.tag ?? '', /^MIERU_TCP_[a-f0-9]{16}$/)
         assert.deepEqual(config.listeners[0], {
             tag: config.listeners[0]?.tag,
-            port: 443,
+            port: 24443,
             protocol: 'TCP'
         })
         assert.equal(config.mtu, 1400)

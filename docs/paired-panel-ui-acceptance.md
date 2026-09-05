@@ -76,3 +76,11 @@ A separate API editor saved version 2; saving the browser's version-1 draft disp
 warning and kept its unsaved name. Inspection found that the conflict's Reload Latest button
 bypassed the existing discard confirmation. It now uses that same guard; a source-wiring regression
 fails before this one-line change. Rebuilt-image cancellation/confirmation acceptance is pending.
+
+The old Reload Latest behavior was also reproduced in the browser using an agent-authored disposable
+draft: it replaced the unsaved name with the remote version-2 name without a discard dialog.
+
+The Mieru preset audit found its generated port 443 fails both the existing browser validator and
+backend listener schema (minimum 1025). The default is now 24443, with an added port-range assertion
+that failed before the correction. The backend startup parser also needs the corresponding
+Mieru-path correction; a frontend preset fix alone is not restart acceptance.
