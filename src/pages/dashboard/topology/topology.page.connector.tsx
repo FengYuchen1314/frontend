@@ -251,7 +251,7 @@ function CanvasNodeCard({
             data-node-id={node.id}
             opacity={isDragging ? 0.45 : 1}
             p="sm"
-            ref={ref}
+            ref={isFixed ? undefined : ref}
             shadow={isDropTarget ? 'lg' : 'sm'}
             style={{
                 borderColor: hasIssue

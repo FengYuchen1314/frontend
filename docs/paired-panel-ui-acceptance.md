@@ -21,3 +21,29 @@ retest modal opening, typed values, server-type changes and returning from the n
 
 Remaining UI acceptance includes reverse-proxy drafts/conflicts and topology drag/drop,
 save/reload and dirty-state behavior. No completed end-to-end UI acceptance is claimed here.
+
+The baseline image also passed reverse-proxy browser save (API readback confirmed the new
+revision), explicit not-yet-applied messaging, and preservation of a local draft after a second
+editor caused a real HTTP 409. The apply button stayed disabled for the offline test Agent.
+The reload-discard warning appeared, but browser automation returned no active dialog handle
+after interruption; cancel behavior is therefore unverified, not a claimed pass.
+
+Both distinct physical-server resources were successfully dragged into a new topology draft.
+Another finding was verified in the live DOM: `useSortable` attached `role=button` and
+`aria-disabled=true` to the fixed ENTRY card. Its native next-hop input was not disabled, but
+the ancestor's disabled semantics incorrectly reported its controls as disabled to assistive
+tooling; native clicking was still possible. Fixed
+ENTRY/EXIT cards now omit the draggable DOM ref; movable cards retain it, and the fixed-node
+movement rule is unchanged. A source regression fails before that one-line change. Fresh-image
+browser confirmation of the corrected accessibility tree is still required.
+
+Local tests and type-check pass for the changes. Changed-file lint passes, while whole-tree
+lint reports 16 errors and 12 warnings in other files; do not report whole-tree lint as clean.
+
+The baseline browser also completed a two-server chain using actual resource dragging and
+next-hop selection: Entry → public Vision Host → broadband SOCKS Host → Exit. Saving created
+`Browser Two Server Chain`, version 1. Separate authenticated API readback confirmed two
+distinct physical servers, three edges, an unpublished draft and successful server validation.
+The browser preview displayed a supported Mihomo injection with the broadband proxy's
+`dialer-proxy` set to the public Vision proxy. This verifies graph authoring and preview wiring,
+not a complete user subscription or actual client traffic.
