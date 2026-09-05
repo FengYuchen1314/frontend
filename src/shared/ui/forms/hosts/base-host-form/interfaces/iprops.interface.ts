@@ -1,3 +1,5 @@
+import type { FormEventHandler } from 'react'
+
 import { UseFormReturnType } from '@mantine/form'
 import {
     CreateHostCommand,
@@ -18,7 +20,7 @@ export interface IProps<
 > {
     configProfiles: GetConfigProfilesCommand.Response['response']['configProfiles']
     form: UseFormReturnType<T>
-    handleSubmit: () => void
+    handleSubmit: FormEventHandler<HTMLFormElement>
     hostTags: GetHostsTagsCommand.Response['response']['tags']
     internalSquads: GetInternalSquadsCommand.Response['response']['internalSquads']
     isBulkEdit?: boolean

@@ -113,23 +113,6 @@ export const CreateHostDrawer = NiceModal.create(() => {
         return null
     })
 
-    form.watch('inbound.configProfileInboundUuid', ({ value }) => {
-        const { configProfileUuid } = form.getValues().inbound
-        if (!configProfileUuid) {
-            return
-        }
-
-        const configProfile = configProfiles?.configProfiles.find(
-            (configProfile) => configProfile.uuid === configProfileUuid
-        )
-        if (configProfile) {
-            form.setFieldValue(
-                'port',
-                configProfile.inbounds.find((inbound) => inbound.uuid === value)?.port ?? 0
-            )
-        }
-    })
-
     return (
         <Drawer
             {...modalProps}

@@ -96,23 +96,6 @@ export const EditHostDrawerContent = (props: IProps) => {
         }
     }, [configProfiles])
 
-    form.watch('inbound.configProfileInboundUuid', ({ value }) => {
-        const { inbound } = form.getValues()
-        if (!inbound?.configProfileUuid) {
-            return
-        }
-
-        const configProfile = configProfiles?.configProfiles.find(
-            (configProfile) => configProfile.uuid === inbound.configProfileUuid
-        )
-        if (configProfile) {
-            form.setFieldValue(
-                'port',
-                configProfile.inbounds.find((inbound) => inbound.uuid === value)?.port ?? undefined
-            )
-        }
-    })
-
     const handleSubmit = form.onSubmit(async (values) => {
         updateHost({
             variables: {

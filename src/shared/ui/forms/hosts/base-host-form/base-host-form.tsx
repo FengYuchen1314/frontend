@@ -3,22 +3,23 @@ import { HostSelectInboundFeature } from '@features/ui/dashboard/hosts/host-sele
 import {
     ActionIcon,
     Alert,
+    Anchor,
     Button,
     Group,
     Popover,
     NumberInput,
+    Radio,
     Stack,
     Text,
     TextInput
 } from '@mantine/core'
 import {
     CreateHostCommand,
-    GetConfigProfilesCommand,
     UpdateHostCommand,
     UpdateManyHostsCommand
 } from '@remnawave/backend-contract'
 import { INTERNAL_SQUADS_MODE, SECURITY_LAYERS } from '@remnawave/backend-contract'
-import { useMemo } from 'react'
+import { type FormEvent, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { HiQuestionMarkCircle } from 'react-icons/hi'
 import { PiArrowsLeftRight, PiFloppyDiskDuotone } from 'react-icons/pi'
@@ -32,30 +33,17 @@ import { HostVisibility } from './host-visibility'
 import { IProps } from './interfaces'
 import { getHostJsonFields } from './json-fields'
 import {
+    inferMieruMappingMode,
+    isManagedMieruInbound,
+    resolveMieruPortMapping,
+    type MieruMappingMode
+} from './mieru-port-mapping'
+import {
     HostFormDataProvider,
     HostOptionsProvider,
     HostOptionsSection,
     IHostFormData
 } from './options'
-
-type ConfigProfileInbound =
-    GetConfigProfilesCommand.Response['response']['configProfiles'][number]['inbounds'][number]
-
-const asRecord = (value: unknown): Record<string, unknown> | null => {
-    if (typeof value !== 'object' || value === null || Array.isArray(value)) return null
-    return value as Record<string, unknown>
-}
-
-const asManagedMieruInbound = (
-    inbound: ConfigProfileInbound | undefined
-): ConfigProfileInbound | null => {
-    if (!inbound || inbound.type.toLowerCase() !== 'mieru') return null
-
-    const rawInbound = asRecord(inbound.rawInbound)
-    const settings = asRecord(rawInbound?.settings)
-
-    return rawInbound?.protocol === 'mieru' && settings?.transport === 'TCP' ? inbound : null
-}
 
 export const BaseHostForm = <
     T extends
@@ -82,11 +70,62 @@ export const BaseHostForm = <
     const { i18n, t } = useTranslation()
     const internalSquadsMode = form.useWatchValue('internalSquads.mode')
     const inbound = form.useWatchValue('inbound') as T['inbound']
-    const selectedMieruInbound = asManagedMieruInbound(
-        configProfiles
-            ?.find((profile) => profile.uuid === inbound?.configProfileUuid)
-            ?.inbounds.find((item) => item.uuid === inbound?.configProfileInboundUuid)
+    const entryPort = form.useWatchValue('port')
+    const selectedProfile = configProfiles.find(
+        (profile) => profile.uuid === inbound?.configProfileUuid
     )
+    const selectedInbound = selectedProfile?.inbounds.find(
+        (item) => item.uuid === inbound?.configProfileInboundUuid
+    )
+    const selectedMieruInbound = isManagedMieruInbound(selectedInbound)
+        ? selectedInbound
+        : undefined
+    const [mieruDraft, setMieruDraft] = useState<{
+        mode: MieruMappingMode
+        ixPort: number | string
+    } | null>(null)
+    const mappingMode =
+        mieruDraft?.mode ?? inferMieruMappingMode(entryPort, selectedMieruInbound?.port)
+    const manualIxPort = mieruDraft?.ixPort ?? selectedMieruInbound?.port ?? ''
+    const mapping =
+        selectedMieruInbound && !isBulkEdit
+            ? resolveMieruPortMapping(
+                  selectedProfile?.inbounds ?? [],
+                  mappingMode,
+                  entryPort,
+                  manualIxPort
+              )
+            : null
+    const mappingError =
+        mapping && (!mapping.valid || mapping.inboundUuid !== selectedMieruInbound?.uuid)
+            ? t(
+                  `base-host-form.mieru-mapping-error-${mapping.valid ? 'not-configured' : mapping.error}`
+              )
+            : null
+
+    const applyMieruMapping = (mode: MieruMappingMode, port: unknown, ixPort: number | string) => {
+        setMieruDraft({ mode, ixPort })
+        if (!selectedProfile || !selectedMieruInbound || isBulkEdit) return
+        const result = resolveMieruPortMapping(selectedProfile.inbounds, mode, port, ixPort)
+        if (result.valid && result.inboundUuid !== selectedMieruInbound.uuid) {
+            form.setValues({
+                inbound: {
+                    configProfileUuid: selectedProfile.uuid,
+                    configProfileInboundUuid: result.inboundUuid
+                }
+            } as Partial<T>)
+            form.setTouched((current) => ({ ...current, 'inbound.configProfileInboundUuid': true }))
+            form.setDirty((current) => ({ ...current, 'inbound.configProfileInboundUuid': true }))
+        }
+    }
+
+    const handleMappingSubmit = (event: FormEvent<HTMLFormElement>) => {
+        if (mappingError) {
+            event.preventDefault()
+            return
+        }
+        handleSubmit(event)
+    }
 
     const isAllowOnlyInternalSquads = internalSquadsMode === INTERNAL_SQUADS_MODE.ALLOW_ONLY
     const { error: _internalSquadsModeError, ...internalSquadsModeProps } =
@@ -132,21 +171,34 @@ export const BaseHostForm = <
         )
     }
 
-    const saveInbound = (inbound: string, configProfileUuid: string) => {
+    const saveInbound = (inboundUuid: string, configProfileUuid: string) => {
+        const currentInbound = form.getValues().inbound
+        if (
+            currentInbound?.configProfileInboundUuid === inboundUuid &&
+            currentInbound?.configProfileUuid === configProfileUuid
+        )
+            return
+        const selected = configProfiles
+            .find((profile) => profile.uuid === configProfileUuid)
+            ?.inbounds.find((item) => item.uuid === inboundUuid)
+        setMieruDraft(null)
         form.setValues({
+            ...(!isBulkEdit ? { port: selected?.port ?? 0 } : {}),
             inbound: {
-                configProfileInboundUuid: inbound,
+                configProfileInboundUuid: inboundUuid,
                 configProfileUuid
             }
         } as Partial<T>)
-        form.setTouched({
-            configProfileInboundUuid: true,
-            configProfileUuid: true
-        })
-        form.setDirty({
-            configProfileInboundUuid: true,
-            configProfileUuid: true
-        })
+        form.setTouched((current) => ({
+            ...current,
+            'inbound.configProfileInboundUuid': true,
+            'inbound.configProfileUuid': true
+        }))
+        form.setDirty((current) => ({
+            ...current,
+            'inbound.configProfileInboundUuid': true,
+            'inbound.configProfileUuid': true
+        }))
     }
 
     const patternHoverCard = (showSingle = true, showMulti = true, showWildcard = true) => {
@@ -214,6 +266,7 @@ export const BaseHostForm = <
     }
 
     const tagsInputProps = form.getInputProps('tags')
+    const entryPortProps = form.getInputProps('port')
 
     const handleTagsChange = (value: string[]) => {
         tagsInputProps.onChange?.(value)
@@ -245,7 +298,7 @@ export const BaseHostForm = <
     }
 
     return (
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleMappingSubmit}>
             <HostFormDataProvider value={hostFormData}>
                 <HostOptionsProvider form={form} isBulkEdit={isBulkEdit}>
                     <Stack>
@@ -349,7 +402,17 @@ export const BaseHostForm = <
                                                     ? 'base-host-form.mieru-domestic-entry-port'
                                                     : 'common.field.port'
                                             )}
-                                            {...form.getInputProps('port')}
+                                            {...entryPortProps}
+                                            onChange={(value) => {
+                                                entryPortProps.onChange?.(value)
+                                                if (selectedMieruInbound && !isBulkEdit) {
+                                                    applyMieruMapping(
+                                                        mappingMode,
+                                                        value,
+                                                        manualIxPort
+                                                    )
+                                                }
+                                            }}
                                             allowDecimal={false}
                                             allowNegative={false}
                                             clampBehavior="strict"
@@ -387,6 +450,73 @@ export const BaseHostForm = <
                                             w="30%"
                                         />
                                     </Group>
+                                    {selectedMieruInbound && !isBulkEdit && (
+                                        <Stack gap="sm">
+                                            <Radio.Group
+                                                label={t('base-host-form.mieru-mapping-mode')}
+                                                value={mappingMode}
+                                                onChange={(value) =>
+                                                    applyMieruMapping(
+                                                        value as MieruMappingMode,
+                                                        entryPort,
+                                                        manualIxPort
+                                                    )
+                                                }
+                                            >
+                                                <Stack gap="xs" mt="xs">
+                                                    <Radio
+                                                        value="ONE_TO_ONE"
+                                                        label={t('base-host-form.mieru-one-to-one')}
+                                                    />
+                                                    <Radio
+                                                        value="MANUAL"
+                                                        label={t('base-host-form.mieru-manual-ix')}
+                                                    />
+                                                </Stack>
+                                            </Radio.Group>
+                                            {mappingMode === 'MANUAL' && (
+                                                <>
+                                                    <NumberInput
+                                                        label={t('base-host-form.mieru-ix-port')}
+                                                        value={manualIxPort}
+                                                        onChange={(value) =>
+                                                            applyMieruMapping(
+                                                                'MANUAL',
+                                                                entryPort,
+                                                                value
+                                                            )
+                                                        }
+                                                        min={1025}
+                                                        max={65535}
+                                                        clampBehavior="none"
+                                                        allowDecimal={false}
+                                                        allowNegative={false}
+                                                        required
+                                                    />
+                                                    <Text size="sm" c="orange">
+                                                        {t(
+                                                            'base-host-form.mieru-forwarding-required',
+                                                            { entryPort, ixPort: manualIxPort }
+                                                        )}
+                                                    </Text>
+                                                </>
+                                            )}
+                                            {mappingError && (
+                                                <Alert color="red">{mappingError}</Alert>
+                                            )}
+                                            <Text size="xs" c="dimmed">
+                                                {t('base-host-form.mieru-listener-help')}
+                                            </Text>
+                                            <Anchor
+                                                href={`/dashboard/management/config-profiles/${selectedProfile?.uuid}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                size="sm"
+                                            >
+                                                {t('base-host-form.mieru-edit-listeners')}
+                                            </Anchor>
+                                        </Stack>
+                                    )}
                                 </Stack>
                             </SectionCard.Section>
                         </SectionCard.Root>
@@ -400,7 +530,7 @@ export const BaseHostForm = <
                     <Group gap="xs">
                         <Button
                             color="teal"
-                            disabled={!form.isDirty() || !form.isTouched()}
+                            disabled={!form.isDirty() || !form.isTouched() || !!mappingError}
                             leftSection={<PiFloppyDiskDuotone size="16px" />}
                             loading={isSubmitting}
                             size="md"
