@@ -486,10 +486,15 @@ test('actual hook guards its asynchronous contract parse and preserves successfu
 
 test('both public hook entry points capture ownership and unwrap result variables', () => {
     const source = readFileSync(
-        new URL('./tsq-helpers/create-mutation-hook.ts', import.meta.url),
+        new URL('./tsq-helpers/use-session-mutation.ts', import.meta.url),
         'utf8'
     )
     assert.equal(source.match(/captureSessionMutation\(sessionBoundary, variables\)/g)?.length, 2)
     assert.equal(source.match(/createSessionMutateOptions\(sessionBoundary, options\)/g)?.length, 2)
     assert.match(source, /variables:\s*mutation\.variables\?\.variables/)
+    const factory = readFileSync(
+        new URL('./tsq-helpers/create-mutation-hook.ts', import.meta.url),
+        'utf8'
+    )
+    assert.match(factory, /return useSessionMutation</)
 })

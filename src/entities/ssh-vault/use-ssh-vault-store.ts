@@ -13,6 +13,7 @@ import type {
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
 
+import { getSessionGeneration, subscribeSessionChanges } from '@shared/api/axios'
 import { evaluateVault } from '@shared/api/hooks'
 import { logoutEvents } from '@shared/emitters'
 
@@ -123,6 +124,57 @@ const VAULT_AAD = 'rw-vault-v1'
 const PASSCODE_AAD = 'rw-vault-passcode-v1'
 
 let rawDataKeyCache: null | Uint8Array = null
+let vaultGeneration = 0
+let keyGeneration = 0
+let vaultWrites: Promise<unknown> = Promise.resolve()
+
+interface IVaultOperation {
+    current: () => boolean
+    assertCurrent: () => void
+}
+
+function captureVaultOperation(transition = false): IVaultOperation {
+    if (transition) vaultGeneration += 1
+    const generation = vaultGeneration
+    const keys = keyGeneration
+    const session = getSessionGeneration()
+    const current = () =>
+        generation === vaultGeneration &&
+        keys === keyGeneration &&
+        session === getSessionGeneration()
+    return {
+        current,
+        assertCurrent: () => {
+            if (!current())
+                throw new Error('Vault operation was canceled because it was locked or changed')
+        }
+    }
+}
+
+// Serialize persistence and transitions. A reset/import waits for an already-started write;
+// old queued work cannot recreate records after the replacement vault has committed.
+function withVaultWrite<T>(operation: IVaultOperation, write: () => Promise<T>): Promise<T> {
+    const result = vaultWrites.then(() => {
+        operation.assertCurrent()
+        return write()
+    })
+    vaultWrites = result.catch(() => undefined)
+    return result
+}
+
+async function prepareVaultKeys(rawDataKey: Uint8Array, operation: IVaultOperation) {
+    const dataKey = await importDataKey(rawDataKey)
+    operation.assertCurrent()
+    const indexKey = await deriveIndexKey(rawDataKey)
+    operation.assertCurrent()
+    return { dataKey, indexKey }
+}
+
+function retainRawDataKey(rawDataKey: Uint8Array) {
+    rawDataKeyCache?.fill(0)
+    rawDataKeyCache = rawDataKey.slice()
+    keyGeneration += 1
+}
 
 interface IVaultBackupPayload {
     hosts: IKnownHostRecord[]
@@ -140,20 +192,31 @@ export interface ISshSnippet {
 
 async function wrapPasscode(
     rawDataKey: Uint8Array,
-    passcode: string
+    passcode: string,
+    operation: IVaultOperation
 ): Promise<NonNullable<IVaultMeta['passcode']>> {
     if (!isValidPasscode(passcode)) throw new Error('Passcode is too weak')
 
     const salt = generateSalt()
-    const passcodeKey = await derivePasscodeKey(passcode, salt, evaluateWithPanel)
+    const passcodeKey = await derivePasscodeKey(passcode, salt, async (blinded) => {
+        operation.assertCurrent()
+        const evaluated = await evaluateWithPanel(blinded)
+        operation.assertCurrent()
+        return evaluated
+    })
+    operation.assertCurrent()
 
     const inner = await encrypt(passcodeKey, rawDataKey, PASSCODE_AAD)
+    operation.assertCurrent()
+    const deviceKey = await getOrCreateDeviceKey()
+    operation.assertCurrent()
     const wrapped = await encrypt(
-        await getOrCreateDeviceKey(),
+        deviceKey,
         new TextEncoder().encode(JSON.stringify(inner)),
         PASSCODE_AAD
     )
 
+    operation.assertCurrent()
     return { attempts: 0, length: passcode.length, salt: toBase64(salt), wrapped }
 }
 
@@ -214,28 +277,33 @@ function toKeyInfo(record: INodeKeyRecord): INodeKeyInfo {
 async function storeNodeKey(
     dataKey: CryptoKey | null,
     nodeUuid: string,
-    key: INewNodeKey
+    key: INewNodeKey,
+    operation: IVaultOperation
 ): Promise<INodeKeyInfo> {
-    if (!dataKey) throw new Error('Vault is locked')
-
-    const imported = key.imported ?? false
-
-    await putNodeKey({
-        algo: key.algo,
-        createdAt: new Date().toISOString(),
-        encryptedPrivateKey: await encrypt(
+    try {
+        operation.assertCurrent()
+        if (!dataKey) throw new Error('Vault is locked')
+        const imported = key.imported ?? false
+        const encryptedPrivateKey = await encrypt(
             dataKey,
             key.material,
             nodeAad(nodeUuid, key.publicKeyLine, key.algo)
-        ),
-        imported,
-        nodeUuid,
-        publicKey: key.publicKeyLine
-    })
-
-    key.material.fill(0)
-
-    return { algo: key.algo, imported, publicKey: key.publicKeyLine }
+        )
+        await withVaultWrite(operation, () =>
+            putNodeKey({
+                algo: key.algo,
+                createdAt: new Date().toISOString(),
+                encryptedPrivateKey,
+                imported,
+                nodeUuid,
+                publicKey: key.publicKeyLine
+            })
+        )
+        operation.assertCurrent()
+        return { algo: key.algo, imported, publicKey: key.publicKeyLine }
+    } finally {
+        key.material.fill(0)
+    }
 }
 const snippetAad = (id: string) => `ssh-snippet:${id}`
 
@@ -250,7 +318,9 @@ export const useSshVaultStore = create<IActions & IState>()(
             status: 'unknown',
             actions: {
                 refresh: async () => {
+                    const operation = captureVaultOperation()
                     const meta = await getVaultMeta()
+                    if (!operation.current()) return
 
                     set({
                         hasPasscode: Boolean(meta?.passcode),
@@ -262,138 +332,191 @@ export const useSshVaultStore = create<IActions & IState>()(
                 },
 
                 create: async (seedPhrase, passcode) => {
-                    const kek = await deriveKeyEncryptionKey(seedPhrase)
-                    const rawDataKey = generateDataKey()
-
-                    await putVaultMeta({
-                        createdAt: new Date().toISOString(),
-                        passcode: await wrapPasscode(rawDataKey, passcode),
-                        version: 1,
-                        wrappedDataKey: await encrypt(kek, rawDataKey, VAULT_AAD)
-                    })
-
-                    rawDataKeyCache = rawDataKey
-
-                    set({
-                        dataKey: await importDataKey(rawDataKey),
-                        indexKey: await deriveIndexKey(rawDataKey),
-                        hasPasscode: true,
-                        passcodeAttemptsLeft: PASSCODE_MAX_ATTEMPTS,
-                        passcodeLength: passcode.length,
-                        status: 'unlocked'
+                    const operation = captureVaultOperation(true)
+                    await withVaultWrite(operation, async () => {
+                        const kek = await deriveKeyEncryptionKey(seedPhrase)
+                        operation.assertCurrent()
+                        const rawDataKey = generateDataKey()
+                        try {
+                            const passcodeRecord = await wrapPasscode(
+                                rawDataKey,
+                                passcode,
+                                operation
+                            )
+                            const wrappedDataKey = await encrypt(kek, rawDataKey, VAULT_AAD)
+                            const keys = await prepareVaultKeys(rawDataKey, operation)
+                            operation.assertCurrent()
+                            await putVaultMeta({
+                                createdAt: new Date().toISOString(),
+                                passcode: passcodeRecord,
+                                version: 1,
+                                wrappedDataKey
+                            })
+                            operation.assertCurrent()
+                            retainRawDataKey(rawDataKey)
+                            set({
+                                ...keys,
+                                hasPasscode: true,
+                                passcodeAttemptsLeft: PASSCODE_MAX_ATTEMPTS,
+                                passcodeLength: passcode.length,
+                                status: 'unlocked'
+                            })
+                        } finally {
+                            rawDataKey.fill(0)
+                        }
                     })
                 },
 
                 unlock: async (seedPhrase) => {
-                    const meta = await getVaultMeta()
-                    if (!meta) return false
-
+                    const operation = captureVaultOperation()
                     try {
-                        const kek = await deriveKeyEncryptionKey(seedPhrase)
-                        const rawDataKey = await decrypt(kek, meta.wrappedDataKey, VAULT_AAD)
-
-                        rawDataKeyCache = rawDataKey
-
-                        set({
-                            dataKey: await importDataKey(rawDataKey),
-                            indexKey: await deriveIndexKey(rawDataKey),
-                            status: 'unlocked'
+                        return await withVaultWrite(operation, async () => {
+                            const meta = await getVaultMeta()
+                            operation.assertCurrent()
+                            if (!meta) return false
+                            const kek = await deriveKeyEncryptionKey(seedPhrase)
+                            operation.assertCurrent()
+                            const rawDataKey = await decrypt(kek, meta.wrappedDataKey, VAULT_AAD)
+                            try {
+                                const keys = await prepareVaultKeys(rawDataKey, operation)
+                                operation.assertCurrent()
+                                retainRawDataKey(rawDataKey)
+                                set({ ...keys, status: 'unlocked' })
+                                return true
+                            } finally {
+                                rawDataKey.fill(0)
+                            }
                         })
-                        return true
                     } catch {
                         return false
                     }
                 },
 
                 lock: () => {
+                    vaultGeneration += 1
+                    keyGeneration += 1
                     rawDataKeyCache?.fill(0)
                     rawDataKeyCache = null
                     set({ dataKey: null, indexKey: null, status: 'locked' })
                 },
 
                 setPasscode: async (passcode) => {
-                    const meta = await getVaultMeta()
-                    if (!meta || !rawDataKeyCache) throw new Error('Vault is locked')
-
-                    await putVaultMeta({
-                        ...stripId(meta),
-                        passcode: await wrapPasscode(rawDataKeyCache, passcode)
-                    })
-
-                    set({
-                        hasPasscode: true,
-                        passcodeAttemptsLeft: PASSCODE_MAX_ATTEMPTS,
-                        passcodeLength: passcode.length
+                    const operation = captureVaultOperation()
+                    await withVaultWrite(operation, async () => {
+                        const meta = await getVaultMeta()
+                        operation.assertCurrent()
+                        if (!meta || !rawDataKeyCache) throw new Error('Vault is locked')
+                        const rawDataKey = rawDataKeyCache.slice()
+                        try {
+                            const record = await wrapPasscode(rawDataKey, passcode, operation)
+                            operation.assertCurrent()
+                            await putVaultMeta({ ...stripId(meta), passcode: record })
+                            operation.assertCurrent()
+                            set({
+                                hasPasscode: true,
+                                passcodeAttemptsLeft: PASSCODE_MAX_ATTEMPTS,
+                                passcodeLength: passcode.length
+                            })
+                        } finally {
+                            rawDataKey.fill(0)
+                        }
                     })
                 },
 
                 unlockWithPasscode: async (passcode) => {
-                    const meta = await getVaultMeta()
-                    if (!meta?.passcode) return false
-
-                    let pinKey: CryptoKey
-                    let inner: IEncryptedBlob
-
+                    const operation = captureVaultOperation()
                     try {
-                        const deviceKey = await getDeviceKey()
+                        return await withVaultWrite(operation, async () => {
+                            const meta = await getVaultMeta()
+                            operation.assertCurrent()
+                            if (!meta?.passcode) return false
+                            let pinKey: CryptoKey
+                            let inner: IEncryptedBlob
+                            try {
+                                const deviceKey = await getDeviceKey()
+                                operation.assertCurrent()
+                                if (!deviceKey) throw new Error(VAULT_DEVICE_KEY_MISSING)
 
-                        if (!deviceKey) throw new Error(VAULT_DEVICE_KEY_MISSING)
+                                inner = JSON.parse(
+                                    new TextDecoder().decode(
+                                        await decrypt(
+                                            deviceKey,
+                                            meta.passcode.wrapped,
+                                            PASSCODE_AAD
+                                        )
+                                    )
+                                ) as IEncryptedBlob
+                                operation.assertCurrent()
+                                pinKey = await derivePasscodeKey(
+                                    passcode,
+                                    fromBase64(meta.passcode.salt),
+                                    async (blinded) => {
+                                        operation.assertCurrent()
+                                        const evaluated = await evaluateWithPanel(blinded)
+                                        operation.assertCurrent()
+                                        return evaluated
+                                    }
+                                )
+                                operation.assertCurrent()
+                            } catch (error) {
+                                operation.assertCurrent()
+                                throw error instanceof Error &&
+                                    error.message === VAULT_DEVICE_KEY_MISSING
+                                    ? error
+                                    : new Error('Vault is temporarily unavailable')
+                            }
 
-                        inner = JSON.parse(
-                            new TextDecoder().decode(
-                                await decrypt(deviceKey, meta.passcode.wrapped, PASSCODE_AAD)
-                            )
-                        ) as IEncryptedBlob
+                            let rawDataKey: Uint8Array
+                            try {
+                                rawDataKey = await decrypt(pinKey, inner, PASSCODE_AAD)
+                            } catch {
+                                operation.assertCurrent()
+                                const attempts = meta.passcode.attempts + 1
+                                const exhausted = attempts >= PASSCODE_MAX_ATTEMPTS
 
-                        pinKey = await derivePasscodeKey(
-                            passcode,
-                            fromBase64(meta.passcode.salt),
-                            evaluateWithPanel
-                        )
+                                await putVaultMeta({
+                                    ...stripId(meta),
+                                    passcode: exhausted ? undefined : { ...meta.passcode, attempts }
+                                })
+                                operation.assertCurrent()
+                                set({
+                                    hasPasscode: !exhausted,
+                                    passcodeAttemptsLeft: exhausted
+                                        ? 0
+                                        : PASSCODE_MAX_ATTEMPTS - attempts
+                                })
+
+                                return false
+                            }
+                            try {
+                                const keys = await prepareVaultKeys(rawDataKey, operation)
+                                operation.assertCurrent()
+                                await putVaultMeta({
+                                    ...stripId(meta),
+                                    passcode: { ...meta.passcode, attempts: 0 }
+                                })
+                                operation.assertCurrent()
+                                retainRawDataKey(rawDataKey)
+                                set({
+                                    ...keys,
+                                    passcodeAttemptsLeft: PASSCODE_MAX_ATTEMPTS,
+                                    status: 'unlocked'
+                                })
+                                return true
+                            } finally {
+                                rawDataKey.fill(0)
+                            }
+                        })
                     } catch (error) {
-                        throw error instanceof Error && error.message === VAULT_DEVICE_KEY_MISSING
-                            ? error
-                            : new Error('Vault is temporarily unavailable')
-                    }
-
-                    try {
-                        const rawDataKey = await decrypt(pinKey, inner, PASSCODE_AAD)
-
-                        rawDataKeyCache = rawDataKey
-
-                        await putVaultMeta({
-                            ...stripId(meta),
-                            passcode: { ...meta.passcode, attempts: 0 }
-                        })
-
-                        set({
-                            dataKey: await importDataKey(rawDataKey),
-                            indexKey: await deriveIndexKey(rawDataKey),
-                            passcodeAttemptsLeft: PASSCODE_MAX_ATTEMPTS,
-                            status: 'unlocked'
-                        })
-
-                        return true
-                    } catch {
-                        const attempts = meta.passcode.attempts + 1
-                        const exhausted = attempts >= PASSCODE_MAX_ATTEMPTS
-
-                        await putVaultMeta({
-                            ...stripId(meta),
-                            passcode: exhausted ? undefined : { ...meta.passcode, attempts }
-                        })
-
-                        set({
-                            hasPasscode: !exhausted,
-                            passcodeAttemptsLeft: exhausted ? 0 : PASSCODE_MAX_ATTEMPTS - attempts
-                        })
-
-                        return false
+                        if (!operation.current()) return false
+                        throw error
                     }
                 },
 
                 exportVault: async () => {
+                    const operation = captureVaultOperation()
                     const meta = await getVaultMeta()
+                    operation.assertCurrent()
                     const { dataKey } = get()
                     if (!meta || !dataKey) throw new Error('Vault is locked')
 
@@ -405,8 +528,8 @@ export const useSshVaultStore = create<IActions & IState>()(
                     }
 
                     const createdAt = new Date().toISOString()
-
-                    return encodeVaultFile({
+                    operation.assertCurrent()
+                    const file = encodeVaultFile({
                         createdAt,
                         payload: await encrypt(
                             dataKey,
@@ -415,83 +538,103 @@ export const useSshVaultStore = create<IActions & IState>()(
                         ),
                         wrappedDataKey: meta.wrappedDataKey
                     })
+                    operation.assertCurrent()
+                    return file
                 },
 
                 importVault: async (file, seedPhrase) => {
-                    let backup: IVaultBackupFile
-                    let rawDataKey: Uint8Array
-                    let records: IVaultBackupPayload
-
+                    const operation = captureVaultOperation(true)
                     try {
-                        backup = decodeVaultFile(file)
-
-                        const kek = await deriveKeyEncryptionKey(seedPhrase)
-                        rawDataKey = await decrypt(kek, backup.wrappedDataKey, VAULT_AAD)
-
-                        const dataKey = await importDataKey(rawDataKey)
-
-                        records = JSON.parse(
-                            new TextDecoder().decode(
-                                unpadPayload(
-                                    await decrypt(
-                                        dataKey,
-                                        backup.payload,
-                                        vaultFileAad(backup.createdAt, backup.wrappedDataKey)
+                        return await withVaultWrite(operation, async () => {
+                            let backup: IVaultBackupFile
+                            let rawDataKey: Uint8Array | undefined
+                            let records: IVaultBackupPayload
+                            try {
+                                try {
+                                    backup = decodeVaultFile(file)
+                                    const kek = await deriveKeyEncryptionKey(seedPhrase)
+                                    operation.assertCurrent()
+                                    rawDataKey = await decrypt(
+                                        kek,
+                                        backup.wrappedDataKey,
+                                        VAULT_AAD
                                     )
-                                )
-                            )
-                        ) as IVaultBackupPayload
-                    } catch {
-                        return false
+                                    const dataKey = await importDataKey(rawDataKey)
+                                    operation.assertCurrent()
+                                    records = JSON.parse(
+                                        new TextDecoder().decode(
+                                            unpadPayload(
+                                                await decrypt(
+                                                    dataKey,
+                                                    backup.payload,
+                                                    vaultFileAad(
+                                                        backup.createdAt,
+                                                        backup.wrappedDataKey
+                                                    )
+                                                )
+                                            )
+                                        )
+                                    ) as IVaultBackupPayload
+                                } catch {
+                                    return false
+                                }
+                                if (!isRestorablePayload(records)) return false
+                                const keys = await prepareVaultKeys(rawDataKey, operation)
+                                operation.assertCurrent()
+                                // Once the restore batch starts, finish its encrypted records before
+                                // allowing a newer reset/restore to run. Never publish canceled keys.
+                                await clearVault()
+                                await putVaultMeta({
+                                    createdAt: backup.createdAt,
+                                    version: 1,
+                                    wrappedDataKey: backup.wrappedDataKey
+                                })
+                                await putNodeKeys(records.keys)
+                                await putKnownHosts(records.hosts)
+                                await putSnippets(records.snippets ?? [])
+                                await putConnectionProfiles(records.profiles ?? [])
+                                operation.assertCurrent()
+                                retainRawDataKey(rawDataKey)
+                                set({
+                                    ...keys,
+                                    hasPasscode: false,
+                                    passcodeAttemptsLeft: PASSCODE_MAX_ATTEMPTS,
+                                    status: 'unlocked'
+                                })
+                                return true
+                            } finally {
+                                rawDataKey?.fill(0)
+                            }
+                        })
+                    } catch (error) {
+                        if (!operation.current()) return false
+                        throw error
                     }
-
-                    if (!isRestorablePayload(records)) return false
-
-                    await clearVault()
-
-                    await putVaultMeta({
-                        createdAt: backup.createdAt,
-                        version: 1,
-                        wrappedDataKey: backup.wrappedDataKey
-                    })
-                    await putNodeKeys(records.keys)
-                    await putKnownHosts(records.hosts)
-                    await putSnippets(records.snippets ?? [])
-                    await putConnectionProfiles(records.profiles ?? [])
-
-                    rawDataKeyCache = rawDataKey
-
-                    set({
-                        dataKey: await importDataKey(rawDataKey),
-                        indexKey: await deriveIndexKey(rawDataKey),
-                        hasPasscode: false,
-                        passcodeAttemptsLeft: PASSCODE_MAX_ATTEMPTS,
-                        status: 'unlocked'
-                    })
-
-                    return true
                 },
 
                 reset: async () => {
-                    rawDataKeyCache?.fill(0)
-                    rawDataKeyCache = null
-
-                    await destroyVault()
-
-                    set({
-                        dataKey: null,
-                        indexKey: null,
-                        hasPasscode: false,
-                        passcodeAttemptsLeft: PASSCODE_MAX_ATTEMPTS,
-                        status: 'absent'
+                    get().actions.lock()
+                    const operation = captureVaultOperation()
+                    await withVaultWrite(operation, async () => {
+                        await destroyVault()
+                        if (!operation.current()) return
+                        set({
+                            dataKey: null,
+                            indexKey: null,
+                            hasPasscode: false,
+                            passcodeAttemptsLeft: PASSCODE_MAX_ATTEMPTS,
+                            status: 'absent'
+                        })
                     })
                 },
 
                 listSnippets: async () => {
+                    const operation = captureVaultOperation()
                     const { dataKey } = get()
                     if (!dataKey) return []
 
                     const records = await getAllSnippets()
+                    if (!operation.current()) return []
                     const snippets: ISshSnippet[] = []
 
                     for (const record of records) {
@@ -513,16 +656,19 @@ export const useSshVaultStore = create<IActions & IState>()(
                         }
                     }
 
-                    return snippets.sort((a, b) => a.name.localeCompare(b.name))
+                    return operation.current()
+                        ? snippets.sort((a, b) => a.name.localeCompare(b.name))
+                        : []
                 },
 
                 saveSnippet: async ({ command, id, name }) => {
+                    const operation = captureVaultOperation()
                     const { dataKey } = get()
                     if (!dataKey) throw new Error('Vault is locked')
 
                     const snippetId = id ?? crypto.randomUUID()
 
-                    await putSnippet({
+                    const record = {
                         createdAt: new Date().toISOString(),
                         id: snippetId,
                         payload: await encrypt(
@@ -530,34 +676,43 @@ export const useSshVaultStore = create<IActions & IState>()(
                             new TextEncoder().encode(JSON.stringify({ command, name })),
                             snippetAad(snippetId)
                         )
-                    })
+                    }
+                    await withVaultWrite(operation, () => putSnippet(record))
+                    operation.assertCurrent()
                 },
 
                 deleteSnippet: async (id) => {
-                    await deleteSnippet(id)
+                    const operation = captureVaultOperation()
+                    if (!get().dataKey) throw new Error('Vault is locked')
+                    await withVaultWrite(operation, () => deleteSnippet(id))
+                    operation.assertCurrent()
                 },
 
                 getProfile: async (nodeUuid) => {
+                    const operation = captureVaultOperation()
                     const { dataKey } = get()
                     const record = await getConnectionProfile(nodeUuid)
-                    if (!dataKey || !record) return null
+                    if (!operation.current() || !dataKey || !record) return null
 
                     try {
-                        return JSON.parse(
+                        const profile = JSON.parse(
                             new TextDecoder().decode(
                                 await decrypt(dataKey, record.payload, profileAad(nodeUuid))
                             )
                         ) as IConnectionProfile
+                        return operation.current() ? profile : null
                     } catch {
                         return null
                     }
                 },
 
                 listProfiles: async () => {
+                    const operation = captureVaultOperation()
                     const { dataKey } = get()
                     if (!dataKey) return []
 
                     const records = await getAllConnectionProfiles()
+                    if (!operation.current()) return []
 
                     const profiles = await Promise.all(
                         records.map(async (record) => {
@@ -577,10 +732,11 @@ export const useSshVaultStore = create<IActions & IState>()(
                         })
                     )
 
-                    return profiles.filter((profile) => profile !== null)
+                    return operation.current() ? profiles.filter((profile) => profile !== null) : []
                 },
 
                 saveProfile: async (profile) => {
+                    const operation = captureVaultOperation()
                     const { dataKey } = get()
                     if (!dataKey) throw new Error('Vault is locked')
 
@@ -589,63 +745,83 @@ export const useSshVaultStore = create<IActions & IState>()(
                         lastUsedAt: new Date().toISOString()
                     }
 
-                    await putConnectionProfile({
+                    const record = {
                         nodeUuid: profile.nodeUuid,
                         payload: await encrypt(
                             dataKey,
                             new TextEncoder().encode(JSON.stringify(value)),
                             profileAad(profile.nodeUuid)
                         )
-                    })
+                    }
+                    await withVaultWrite(operation, () => putConnectionProfile(record))
+                    operation.assertCurrent()
                 },
 
                 getNodePublicKey: async (nodeUuid) => {
+                    const operation = captureVaultOperation()
                     const record = await getNodeKey(nodeUuid)
-                    return record?.publicKey ?? null
+                    return operation.current() ? (record?.publicKey ?? null) : null
                 },
 
                 ensureNodeKey: async (nodeUuid) => {
+                    const operation = captureVaultOperation()
+                    const { dataKey } = get()
+                    if (!dataKey) throw new Error('Vault is locked')
                     const existing = await getNodeKey(nodeUuid)
+                    operation.assertCurrent()
                     if (existing) return toKeyInfo(existing)
 
-                    return storeNodeKey(get().dataKey, nodeUuid, generatedKey(nodeUuid))
+                    return storeNodeKey(dataKey, nodeUuid, generatedKey(nodeUuid), operation)
                 },
 
                 regenerateNodeKey: async (nodeUuid) =>
-                    storeNodeKey(get().dataKey, nodeUuid, generatedKey(nodeUuid)),
+                    storeNodeKey(
+                        get().dataKey,
+                        nodeUuid,
+                        generatedKey(nodeUuid),
+                        captureVaultOperation()
+                    ),
 
                 importNodeKey: async (nodeUuid, privateKey) => {
+                    const operation = captureVaultOperation()
+                    const { dataKey } = get()
+                    if (!dataKey) throw new Error('Vault is locked')
                     const parsed = await parseSshPrivateKey(privateKey, `remnawave:${nodeUuid}`)
 
-                    return storeNodeKey(get().dataKey, nodeUuid, { ...parsed, imported: true })
+                    return storeNodeKey(dataKey, nodeUuid, { ...parsed, imported: true }, operation)
                 },
 
                 getPrivateKey: async (nodeUuid) => {
+                    const operation = captureVaultOperation()
                     const { dataKey } = get()
                     if (!dataKey) return null
 
                     const record = await getNodeKey(nodeUuid)
-                    if (!record) return null
+                    if (!operation.current() || !record) return null
 
                     const algo = record.algo ?? 'ssh-ed25519'
 
-                    return {
-                        algo,
-                        material: await decrypt(
-                            dataKey,
-                            record.encryptedPrivateKey,
-                            nodeAad(nodeUuid, record.publicKey, algo)
-                        )
+                    const material = await decrypt(
+                        dataKey,
+                        record.encryptedPrivateKey,
+                        nodeAad(nodeUuid, record.publicKey, algo)
+                    )
+                    if (!operation.current()) {
+                        material.fill(0)
+                        return null
                     }
+                    return { algo, material }
                 },
 
                 trustedFingerprint: async (target) => {
+                    const operation = captureVaultOperation()
                     const { dataKey, indexKey } = get()
                     if (!dataKey || !indexKey) return null
 
                     const id = await indexId(indexKey, target)
+                    if (!operation.current()) return null
                     const record = await getKnownHost(id)
-                    if (!record) return null
+                    if (!operation.current() || !record) return null
 
                     try {
                         const host = JSON.parse(
@@ -654,13 +830,16 @@ export const useSshVaultStore = create<IActions & IState>()(
                             )
                         ) as IKnownHost
 
-                        return host.target === target ? host.fingerprint : null
+                        return operation.current() && host.target === target
+                            ? host.fingerprint
+                            : null
                     } catch {
                         return null
                     }
                 },
 
                 rememberHost: async (target, algo, fingerprint) => {
+                    const operation = captureVaultOperation()
                     const { dataKey, indexKey } = get()
                     if (!dataKey || !indexKey) throw new Error('Vault is locked')
 
@@ -672,14 +851,16 @@ export const useSshVaultStore = create<IActions & IState>()(
                         target
                     }
 
-                    await putKnownHost({
+                    const record = {
                         id,
                         payload: await encrypt(
                             dataKey,
                             new TextEncoder().encode(JSON.stringify(host)),
                             hostAad(id)
                         )
-                    })
+                    }
+                    await withVaultWrite(operation, () => putKnownHost(record))
+                    operation.assertCurrent()
                 }
             }
         }),
@@ -695,3 +876,4 @@ export const useSshVaultPasscodeLength = () => useSshVaultStore((state) => state
 export const useSshVaultActions = () => useSshVaultStore((state) => state.actions)
 
 logoutEvents.subscribe(() => useSshVaultStore.getState().actions.lock())
+subscribeSessionChanges(() => useSshVaultStore.getState().actions.lock())

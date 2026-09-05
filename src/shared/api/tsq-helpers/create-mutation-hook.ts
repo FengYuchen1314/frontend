@@ -1,27 +1,10 @@
-import {
-    useMutation,
-    useQueryClient,
-    type UseMutateAsyncFunction,
-    type UseMutateFunction,
-    type UseMutationResult
-} from '@tanstack/react-query'
-import { useCallback } from 'react'
+import { useQueryClient, type UseMutationResult } from '@tanstack/react-query'
 import { z } from 'zod'
 
-import { assertSessionGeneration, getSessionGeneration, instance } from '../axios'
+import { instance } from '../axios'
 import { createUrl, handleRequestError } from '../helpers'
 import { CreateMutationHookArgs, MutationResponse } from '../interfaces'
-import {
-    captureSessionMutation,
-    createSessionMutateOptions,
-    createSessionMutationOptions,
-    settleSessionMutation
-} from '../session-mutation'
-
-const sessionBoundary = {
-    getGeneration: getSessionGeneration,
-    assertGeneration: assertSessionGeneration
-}
+import { useSessionMutation } from './use-session-mutation'
 
 export function createMutationHook<
     RouteParamsSchema extends z.ZodType<Record<string, unknown>>,
@@ -90,48 +73,14 @@ export function createMutationHook<
                 context: unknown
             ) => callbacks?.onSettled?.(data, error, variables, context, queryClient)
         })
-        const mutation = useMutation(
-            createSessionMutationOptions<Data, Error, Variables, unknown>(
-                sessionBoundary,
-                {
-                    ...rMutationParams,
-                    ...params?.mutationFns,
-                    mutationFn,
-                    ...lifecycle(rMutationParams)
-                },
-                (variables) => [lifecycle(params?.mutationFns), lifecycle(variables.mutationFns)]
-            )
-        )
-
-        const mutate = useCallback<UseMutateFunction<Data, Error, Variables, unknown>>(
-            (variables, options) => {
-                mutation.mutate(
-                    captureSessionMutation(sessionBoundary, variables),
-                    createSessionMutateOptions(sessionBoundary, options)
-                )
+        return useSessionMutation<Data, Error, Variables, unknown>(
+            {
+                ...rMutationParams,
+                ...params?.mutationFns,
+                mutationFn,
+                ...lifecycle(rMutationParams)
             },
-            [mutation.mutate]
+            (variables) => [lifecycle(params?.mutationFns), lifecycle(variables.mutationFns)]
         )
-        const mutateAsync = useCallback<UseMutateAsyncFunction<Data, Error, Variables, unknown>>(
-            (variables, options) => {
-                const invocation = captureSessionMutation(sessionBoundary, variables)
-                return settleSessionMutation(
-                    sessionBoundary,
-                    invocation,
-                    mutation.mutateAsync(
-                        invocation,
-                        createSessionMutateOptions(sessionBoundary, options)
-                    )
-                )
-            },
-            [mutation.mutateAsync]
-        )
-
-        return {
-            ...mutation,
-            variables: mutation.variables?.variables,
-            mutate,
-            mutateAsync
-        } as UseMutationResult<Data, Error, Variables, unknown>
     }
 }

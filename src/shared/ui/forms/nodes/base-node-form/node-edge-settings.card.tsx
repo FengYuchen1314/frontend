@@ -11,13 +11,15 @@ import {
     TextInput
 } from '@mantine/core'
 import { GetNodeCommand, RestartNodeCommand } from '@remnawave/backend-contract'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
 
-import { instance } from '@shared/api/axios'
+import { getSessionGeneration, instance } from '@shared/api/axios'
+import { requestSessionResponse } from '@shared/api/session-response'
+import { useSessionMutation } from '@shared/api/tsq-helpers/use-session-mutation'
 
 const siteSchema = z.object({ domains: z.array(z.string()), upstream: z.string() })
 const settingsSchema = z.object({
@@ -25,6 +27,7 @@ const settingsSchema = z.object({
     website: siteSchema.nullable()
 })
 const savedSchema = z.object({ revision: z.number().int().nonnegative(), settings: settingsSchema })
+const saveResponseSchema = z.object({ response: savedSchema })
 const responseSchema = z.object({
     response: savedSchema.extend({
         runtime: z
@@ -52,7 +55,8 @@ export function NodeEdgeSettingsCard({ node }: { node: GetNodeCommand.Response['
     const [error, setError] = useState('')
     const query = useQuery({
         queryKey: key,
-        queryFn: async () => responseSchema.parse((await instance.get(url)).data).response,
+        queryFn: ({ signal }) =>
+            requestSessionResponse(() => instance.get(url, { signal }), responseSchema),
         retry: false,
         refetchOnWindowFocus: false
     })
@@ -62,17 +66,17 @@ export function NodeEdgeSettingsCard({ node }: { node: GetNodeCommand.Response['
         setBaseline(JSON.stringify(value.settings))
     }
     const dirty = draft !== null && baseline !== null && JSON.stringify(draft.settings) !== baseline
-    const save = useMutation({
+    const save = useSessionMutation({
         mutationFn: async () => {
             if (!draft) throw new Error('Settings have not loaded')
-            return z.object({ response: savedSchema }).parse(
-                (
-                    await instance.put(url, {
+            return requestSessionResponse(
+                () =>
+                    instance.put(url, {
                         expectedRevision: draft.revision,
                         settings: draft.settings
-                    })
-                ).data
-            ).response
+                    }),
+                saveResponseSchema
+            )
         },
         onSuccess: (saved) => {
             load(saved)
@@ -100,7 +104,7 @@ export function NodeEdgeSettingsCard({ node }: { node: GetNodeCommand.Response['
             )
         }
     })
-    const apply = useMutation({
+    const apply = useSessionMutation({
         mutationFn: async () => {
             await instance.post(
                 RestartNodeCommand.url(node.uuid),
@@ -257,7 +261,11 @@ export function NodeEdgeSettingsCard({ node }: { node: GetNodeCommand.Response['
                                         )
                                     )
                                         return
+                                    const generation = getSessionGeneration()
                                     const result = await query.refetch()
+                                    // Cancellation can return the observer's previous
+                                    // cached value after the shared cache was cleared.
+                                    if (generation !== getSessionGeneration()) return
                                     if (result.data && !result.error) {
                                         load(result.data)
                                         setError('')

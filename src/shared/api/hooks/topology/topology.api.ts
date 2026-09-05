@@ -4,11 +4,13 @@ import {
     type TopologyFormat,
     type TopologyGraph
 } from '@features/dashboard/topology/lib/topology-graph'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
 import { z } from 'zod'
 
 import { instance } from '../../axios'
+import { requestSessionResponse } from '../../session-response'
+import { useSessionMutation } from '../../tsq-helpers/use-session-mutation'
 
 const topologyPositionSchema = z.object({
     x: z.number().finite().min(-1_000_000).max(1_000_000),
@@ -128,19 +130,14 @@ export const topologyQueryKeys = {
     detail: (uuid: string) => ['topologies', uuid] as const
 }
 
-const parseResponse = <T>(schema: z.ZodType<T>, value: unknown): T => {
-    const result = schema.safeParse(value)
-    if (!result.success) throw result.error
-    return result.data
-}
-
 export const useGetTopologies = () =>
     useQuery({
         queryKey: topologyQueryKeys.all,
-        queryFn: async () => {
-            const { data } = await instance.get('/api/topologies')
-            return parseResponse(listResponseSchema, data).response
-        }
+        queryFn: ({ signal }) =>
+            requestSessionResponse(
+                () => instance.get('/api/topologies', { signal }),
+                listResponseSchema
+            )
     })
 
 export const useGetTopology = (uuid: null | string) =>
@@ -148,19 +145,21 @@ export const useGetTopology = (uuid: null | string) =>
         enabled: uuid !== null,
         queryKey:
             uuid === null ? [...topologyQueryKeys.all, 'none'] : topologyQueryKeys.detail(uuid),
-        queryFn: async () => {
-            const { data } = await instance.get(`/api/topologies/${uuid}`)
-            return parseResponse(topologyResponseSchema, data).response
-        }
+        queryFn: ({ signal }) =>
+            requestSessionResponse(
+                () => instance.get(`/api/topologies/${uuid}`, { signal }),
+                topologyResponseSchema
+            )
     })
 
 export const useCreateTopology = () => {
     const queryClient = useQueryClient()
-    return useMutation({
-        mutationFn: async (payload: { graph: TopologyGraph; name: string }) => {
-            const { data } = await instance.post('/api/topologies', payload)
-            return parseResponse(topologyResponseSchema, data).response
-        },
+    return useSessionMutation({
+        mutationFn: (payload: { graph: TopologyGraph; name: string }) =>
+            requestSessionResponse(
+                () => instance.post('/api/topologies', payload),
+                topologyResponseSchema
+            ),
         onSuccess: (topology) => {
             queryClient.setQueryData(topologyQueryKeys.detail(topology.uuid), topology)
             queryClient.invalidateQueries({ queryKey: topologyQueryKeys.all })
@@ -170,8 +169,8 @@ export const useCreateTopology = () => {
 
 export const useUpdateTopology = () => {
     const queryClient = useQueryClient()
-    return useMutation({
-        mutationFn: async ({
+    return useSessionMutation({
+        mutationFn: ({
             uuid,
             ...payload
         }: {
@@ -180,10 +179,11 @@ export const useUpdateTopology = () => {
             isPublished?: boolean
             name?: string
             uuid: string
-        }) => {
-            const { data } = await instance.patch(`/api/topologies/${uuid}`, payload)
-            return parseResponse(topologyResponseSchema, data).response
-        },
+        }) =>
+            requestSessionResponse(
+                () => instance.patch(`/api/topologies/${uuid}`, payload),
+                topologyResponseSchema
+            ),
         onSuccess: (topology) => {
             queryClient.setQueryData(topologyQueryKeys.detail(topology.uuid), topology)
             queryClient.invalidateQueries({ queryKey: topologyQueryKeys.all })
@@ -193,7 +193,7 @@ export const useUpdateTopology = () => {
 
 export const useDeleteTopology = () => {
     const queryClient = useQueryClient()
-    return useMutation({
+    return useSessionMutation({
         mutationFn: async ({
             expectedVersion,
             uuid
@@ -211,28 +211,21 @@ export const useDeleteTopology = () => {
 }
 
 export const useValidateTopology = () =>
-    useMutation({
-        mutationFn: async (graph: TopologyGraph) => {
-            const { data } = await instance.post('/api/topologies/actions/validate', { graph })
-            return parseResponse(validationResponseSchema, data).response
-        }
+    useSessionMutation({
+        mutationFn: (graph: TopologyGraph) =>
+            requestSessionResponse(
+                () => instance.post('/api/topologies/actions/validate', { graph }),
+                validationResponseSchema
+            )
     })
 
 export const usePreviewTopology = () =>
-    useMutation({
-        mutationFn: async ({
-            formats,
-            graph
-        }: {
-            formats: TopologyFormat[]
-            graph: TopologyGraph
-        }) => {
-            const { data } = await instance.post('/api/topologies/actions/preview', {
-                graph,
-                formats
-            })
-            return parseResponse(previewResponseSchema, data).response
-        }
+    useSessionMutation({
+        mutationFn: ({ formats, graph }: { formats: TopologyFormat[]; graph: TopologyGraph }) =>
+            requestSessionResponse(
+                () => instance.post('/api/topologies/actions/preview', { graph, formats }),
+                previewResponseSchema
+            )
     })
 
 export const isTopologyVersionConflict = (error: unknown) =>

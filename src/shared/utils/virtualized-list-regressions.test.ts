@@ -115,6 +115,33 @@ test('flat inbound selected/unselected filtering uses current UUID membership', 
     assert.equal(filter('all', new Set()), allInbounds)
 })
 
+test('flat inbound group keeps the browser-verified height-chain stylesheet connected', () => {
+    // Wiring guard only. The real geometry regression is the independently served
+    // virtualized-height-runtime.fixture.mjs page and its browser-measured PASS/FAIL.
+    const directory = '../ui/config-profiles/virtualized-flat-inbounds-list/'
+    const file = sourceFile(`${directory}virtualized-flat-inbounds-list.shared.tsx`)
+    const group = findNode(
+        file,
+        (node): node is ts.JsxOpeningElement =>
+            ts.isJsxOpeningElement(node) && node.tagName.getText(file) === 'Checkbox.Group'
+    )
+    const className = group.attributes.properties.find(
+        (node): node is ts.JsxAttribute =>
+            ts.isJsxAttribute(node) && node.name.getText(file) === 'className'
+    )
+    assert(className?.initializer && ts.isJsxExpression(className.initializer))
+    assert.equal(className.initializer.expression?.getText(file), 'classes.checkboxGroup')
+    const css = readFileSync(
+        new URL(`${directory}VirtualizedFlatInboundsList.module.css`, import.meta.url),
+        'utf8'
+    )
+    assert.match(file.text, /import classes from '\.\/VirtualizedFlatInboundsList\.module\.css'/)
+    assert.match(
+        css,
+        /\.checkboxGroup\s*,\s*\.checkboxGroup\s*>\s*\[role=['"]group['"]\]\s*\{[^}]*height:\s*100%/
+    )
+})
+
 test('billing scroll fade and pagination follow measured scroll state and do not duplicate pending loads', () => {
     const file = sourceFile(
         '../../widgets/dashboard/infra-billing/mobile/virtualized-records-list.widget.tsx'

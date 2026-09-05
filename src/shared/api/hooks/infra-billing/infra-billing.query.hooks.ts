@@ -11,6 +11,7 @@ import { sToMs } from '@shared/utils/time-utils'
 
 import { instance } from '../../axios'
 import { createUrl } from '../../helpers'
+import { requestSessionResponse } from '../../session-response'
 import { createGetQueryHook, errorHandler } from '../../tsq-helpers'
 
 export const infraBillingQueryKeys = createQueryKeys('infraBilling', {
@@ -73,21 +74,17 @@ export const useGetInfraBillingHistoryRecordsInfinite = (size = HISTORY_RECORDS_
     useInfiniteQuery({
         queryKey: [...infraBillingQueryKeys.getInfraBillingHistoryRecords._def, 'infinite', size],
         initialPageParam: 0,
-        queryFn: async ({ pageParam }) => {
+        queryFn: async ({ pageParam, signal }) => {
             const url = createUrl(GetInfraBillingRecordsCommand.TSQ_url, {
                 start: pageParam,
                 size
             })
 
             try {
-                const response = await instance.get(url)
-                const result = await GetInfraBillingRecordsCommand.ResponseSchema.safeParseAsync(
-                    response.data
+                return await requestSessionResponse(
+                    () => instance.get(url, { signal }),
+                    GetInfraBillingRecordsCommand.ResponseSchema
                 )
-                if (!result.success) {
-                    throw result.error
-                }
-                return result.data.response
             } catch (error) {
                 errorHandler(error, 'Get Infra Billing History Records (infinite)')
                 throw error

@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { Virtuoso } from 'react-virtuoso'
 
 import { FlatInboundCheckboxCardShared } from '../flat-inbound-checkbox-card/flat-inbound-checkbox-card.shared'
+import classes from './VirtualizedFlatInboundsList.module.css'
 
 const INBOUND_HEIGHT = 60
 
@@ -43,7 +44,7 @@ export const VirtualizedFlatInboundsListShared = memo((props: IProps) => {
                 padding: '8px'
             }}
         >
-            <Checkbox.Group style={{ height: '100%' }}>
+            <Checkbox.Group className={classes.checkboxGroup}>
                 <Virtuoso
                     computeItemKey={(_, { inbound }) => inbound.uuid}
                     data={filteredInbounds}

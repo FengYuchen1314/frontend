@@ -88,16 +88,5 @@ export const usePasskeyAuthenticationVerify = createMutationHook({
     endpoint: VerifyPasskeyAuthenticationCommand.TSQ_url,
     bodySchema: VerifyPasskeyAuthenticationCommand.RequestBodySchema,
     responseSchema: VerifyPasskeyAuthenticationCommand.ResponseSchema,
-    requestMethod: VerifyPasskeyAuthenticationCommand.endpointDetails.REQUEST_METHOD,
-    rMutationParams: {
-        onSuccess: (data) => {
-            notifications.show({
-                title: 'Passkey Verified',
-                message: 'Passkey authenticated successfully',
-                color: 'teal'
-            })
-
-            setToken({ token: data.accessToken })
-        }
-    }
+    requestMethod: VerifyPasskeyAuthenticationCommand.endpointDetails.REQUEST_METHOD
 })

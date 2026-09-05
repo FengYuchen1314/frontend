@@ -115,18 +115,8 @@ jobs:
             npx oxfmt --check "${changed_files[@]}"
           fi
 
-      - name: Lint changed source files
-        shell: bash
-        run: |
-          mapfile -d '' -t source_files < <(
-            git diff --name-only -z --diff-filter=ACMR \
-              "${{ steps.changes.outputs.base }}" \
-              "${{ steps.changes.outputs.head }}" -- \
-              '*.js' '*.jsx' '*.ts' '*.tsx'
-          )
-          if ((${#source_files[@]})); then
-            npx oxlint --format=stylish "${source_files[@]}"
-          fi
+      - name: Lint all source files
+        run: npm run lint
 
       - name: Test
         run: npm test

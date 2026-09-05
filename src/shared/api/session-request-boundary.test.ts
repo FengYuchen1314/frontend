@@ -4,6 +4,7 @@ import axios, {
     type AxiosResponse,
     type InternalAxiosRequestConfig
 } from 'axios'
+import consola from 'consola/browser'
 import assert from 'node:assert/strict'
 import { after, beforeEach, test } from 'node:test'
 import { z } from 'zod'
@@ -16,7 +17,13 @@ Object.assign(globalThis, {
     window: { location: { origin: 'https://panel.example' } }
 })
 
-const { instance, setAuthorizationToken, getAuthorizationToken } = await import('./axios.ts')
+const {
+    instance,
+    setAuthorizationToken,
+    getAuthorizationToken,
+    getSessionGeneration,
+    subscribeSessionChanges
+} = await import('./axios.ts')
 const { queryClient } = await import('./query-client.ts')
 const { logoutEvents } = await import('../emitters/emit-logout.ts')
 const { requestSessionResponse } = await import('./session-response.ts')
@@ -253,4 +260,50 @@ test('request authorization is captured before a synchronous account switch', as
     assert.equal(held.getConfig()?.headers.get('Authorization'), 'Bearer first-session')
     held.complete(200)
     assert(axios.isCancel(await outcome))
+})
+
+test('sensitive-state subscribers are notified synchronously on every real session transition', () => {
+    const generations: number[] = []
+    const unsubscribe = subscribeSessionChanges(() => {
+        generations.push(getSessionGeneration())
+        assert.equal(queryClient.getQueryData(['private']), undefined)
+    })
+    try {
+        const initial = getSessionGeneration()
+        queryClient.setQueryData(['private'], 'fixture')
+        setAuthorizationToken('first')
+        assert.deepEqual(generations, [initial + 1])
+        setAuthorizationToken('first')
+        assert.equal(generations.length, 1)
+        setAuthorizationToken('second')
+        setAuthorizationToken('')
+        assert.deepEqual(generations, [initial + 1, initial + 2, initial + 3])
+    } finally {
+        unsubscribe()
+    }
+    setAuthorizationToken('after-unsubscribe')
+    assert.equal(generations.length, 3)
+})
+
+test('a broken subscriber or cache callback cannot prevent remaining state from locking', async (context) => {
+    const { createSessionRequestBoundary } = await import('./session-request-boundary.ts')
+    const log = context.mock.method(consola, 'error', () => {})
+    const boundary = createSessionRequestBoundary(
+        axios.create(),
+        () => {},
+        () => {
+            throw new Error('fixture cache cleanup failure')
+        }
+    )
+    let locked = false
+    boundary.subscribe(() => {
+        throw new Error('fixture subscriber failure')
+    })
+    boundary.subscribe(() => {
+        locked = true
+    })
+    assert.throws(() => boundary.setToken('fixture'), /cache cleanup failure/)
+    assert.equal(locked, true)
+    assert.equal(boundary.getToken(), 'fixture')
+    assert.equal(log.mock.callCount(), 1)
 })

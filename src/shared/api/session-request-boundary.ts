@@ -4,6 +4,7 @@ import {
     type AxiosInstance,
     type InternalAxiosRequestConfig
 } from 'axios'
+import consola from 'consola/browser'
 
 export class InactiveSessionError extends CanceledError<unknown> {
     constructor() {
@@ -20,6 +21,7 @@ export function createSessionRequestBoundary(
     let token = ''
     let generation = 0
     const requests = new WeakMap<InternalAxiosRequestConfig, number>()
+    const listeners = new Set<() => void>()
 
     const isStale = (config: InternalAxiosRequestConfig | undefined) =>
         config !== undefined && requests.has(config) && requests.get(config) !== generation
@@ -69,13 +71,30 @@ export function createSessionRequestBoundary(
         assertGeneration: (expected: number) => {
             if (expected !== generation) throw new InactiveSessionError()
         },
+        subscribe: (listener: () => void) => {
+            listeners.add(listener)
+            return () => {
+                listeners.delete(listener)
+            }
+        },
         setToken: (nextToken: string) => {
             if (nextToken === token) return
             token = nextToken
             generation++
             // Clear on login, account replacement AND expiration. Header-only
             // logout handlers otherwise leave cached records behind on a 401.
-            onSessionChange()
+            try {
+                onSessionChange()
+            } finally {
+                for (const listener of listeners) {
+                    try {
+                        listener()
+                    } catch {
+                        // One subscriber must not prevent other sensitive state from locking.
+                        consola.error('Session change listener failed')
+                    }
+                }
+            }
         }
     }
 }

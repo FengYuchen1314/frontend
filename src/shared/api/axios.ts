@@ -51,3 +51,4 @@ export const getAuthorizationToken = authorizationSession.getToken
 export const hasAuthorizationToken = () => getAuthorizationToken() !== ''
 export const getSessionGeneration = authorizationSession.getGeneration
 export const assertSessionGeneration = authorizationSession.assertGeneration
+export const subscribeSessionChanges = authorizationSession.subscribe

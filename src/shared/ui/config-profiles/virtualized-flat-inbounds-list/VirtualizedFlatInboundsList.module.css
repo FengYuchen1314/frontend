@@ -1,0 +1,6 @@
+/* Checkbox.Group inserts a role=group fieldset between its root and the scroller. */
+.checkboxGroup,
+.checkboxGroup > [role='group'] {
+    height: 100%;
+    min-height: 0;
+}

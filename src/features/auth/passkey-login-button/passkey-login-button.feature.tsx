@@ -5,11 +5,21 @@ import {
     type PublicKeyCredentialRequestOptionsJSON,
     startAuthentication
 } from '@simplewebauthn/browser'
-import { useState } from 'react'
+import { isCancel } from 'axios'
+import { useEffect, useState } from 'react'
 import { TbFingerprint } from 'react-icons/tb'
 
+import {
+    assertSessionGeneration,
+    getSessionGeneration,
+    subscribeSessionChanges
+} from '@shared/api/axios'
 import { usePasskeyAuthenticationOptions, usePasskeyAuthenticationVerify } from '@shared/api/hooks'
 import { useAuth } from '@shared/hooks/use-auth'
+
+import { setToken } from '@entities/auth/session-store'
+
+import { createPasskeyLoginFlow } from './passkey-login-flow'
 
 interface IProps {
     authentication: NonNullable<GetStatusCommand.Response['response']['authentication']>
@@ -19,35 +29,62 @@ export const PasskeyLoginButtonFeature = (props: IProps) => {
     const { authentication } = props
 
     const [isLoading, setIsLoading] = useState(false)
+    const [flow] = useState(() =>
+        createPasskeyLoginFlow({
+            getGeneration: getSessionGeneration,
+            assertGeneration: assertSessionGeneration
+        })
+    )
+
+    useEffect(() => {
+        const invalidate = () => {
+            flow.invalidate()
+        }
+        const unsubscribe = subscribeSessionChanges(() => {
+            invalidate()
+            setIsLoading(false)
+        })
+        return () => {
+            unsubscribe()
+            invalidate()
+        }
+    }, [flow])
 
     const { setIsAuthenticated } = useAuth()
 
-    const { mutateAsync: verifyAuthentication, isPending } = usePasskeyAuthenticationVerify()
+    const { mutateAsync: verifyAuthentication } = usePasskeyAuthenticationVerify()
     const { refetch } = usePasskeyAuthenticationOptions()
 
     const handlePasskeyLogin = async () => {
         setIsLoading(true)
 
         try {
-            const verificationOptions = await refetch()
-
-            const authenticationResponse = await startAuthentication({
-                optionsJSON: verificationOptions.data as PublicKeyCredentialRequestOptionsJSON
-            })
-
-            await verifyAuthentication(
-                {
-                    variables: {
-                        response: authenticationResponse
+            await flow.run({
+                getOptions: async () => {
+                    const options = await refetch()
+                    if (options.isError || !options.data) {
+                        throw (
+                            options.error ?? new Error('Passkey authentication options unavailable')
+                        )
                     }
+                    return options.data as PublicKeyCredentialRequestOptionsJSON
                 },
-                {
-                    onSuccess: () => {
-                        setIsAuthenticated(true)
-                    }
-                }
-            )
+                authenticate: (optionsJSON) => startAuthentication({ optionsJSON }),
+                verify: (response) => verifyAuthentication({ variables: { response } }),
+                onSuccess: (data) => {
+                    setIsLoading(false)
+                    setToken({ token: data.accessToken })
+                    setIsAuthenticated(true)
+                    notifications.show({
+                        title: 'Passkey Verified',
+                        message: 'Passkey authenticated successfully',
+                        color: 'teal'
+                    })
+                },
+                onSettled: () => setIsLoading(false)
+            })
         } catch (error: unknown) {
+            if (isCancel(error)) return
             if (error instanceof Error) {
                 if (error.name === 'NotAllowedError') {
                     notifications.show({
@@ -63,8 +100,6 @@ export const PasskeyLoginButtonFeature = (props: IProps) => {
                     })
                 }
             }
-        } finally {
-            setIsLoading(false)
         }
     }
 
@@ -75,7 +110,7 @@ export const PasskeyLoginButtonFeature = (props: IProps) => {
             color="dark"
             leftSection={<TbFingerprint color="white" size={20} />}
             loaderProps={{ type: 'dots' }}
-            loading={isLoading || isPending}
+            loading={isLoading}
             onClick={handlePasskeyLogin}
             variant="filled"
         >
