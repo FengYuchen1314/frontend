@@ -17,6 +17,10 @@
 - Passkey 的 10 项测试执行生产事件处理逻辑及独立流程，不冒充真实硬件认证器验收。
 - 主任务通过浏览器打开独立 React/Mantine/Virtuoso SSR + 真实 CSS 探针：平铺列表旧结构视口为 0px，生产 CSS 修复后为 342px；分组、用户内组、简单内组和账单结构视口分别为 360、182、184、360px，内容均超出视口。该证据只证明浏览器布局，不证明完整 hydration、选择、滚动或分页交互。
 - 手动布局探针：在仓库根目录执行 `node src/shared/utils/virtualized-height-runtime.fixture.mjs`，通过页面所示的本地地址查看结果，完成后停止该专用进程。探针不构建应用。
-- 上一检查点 Frontend `1d1839d0` 的 [CI](https://github.com/FengYuchen1314/frontend/actions/runs/33975968362) 已通过；Backend `c5b9d397` 的 [CI](https://github.com/FengYuchen1314/backend/actions/runs/33975968368) 已通过真实 PostgreSQL 并发替换、回滚、应用编译和依赖注入检查。这些结果不能代替本轮新增前端修复的 Actions 和 VPS 验收。
+- 最新 Frontend `eb8f1790ec080787091e4c00cdaf05cdaf7b04e4` 的 [CI](https://github.com/FengYuchen1314/frontend/actions/runs/33976780218) 已成功：日志确认 53 + 73 = 126 项测试全部通过，同时通过类型检查、全仓 lint 和应用编译。Actions 已验证前端 lockfile 固定的 tsx 4.23.13。
+- Backend `c5b9d397` 的 [CI](https://github.com/FengYuchen1314/backend/actions/runs/33975968368) 已通过真实 PostgreSQL 并发替换、回滚、应用编译和依赖注入检查。
+- 指定上述精确前后端 SHA 的 [配套镜像任务](https://github.com/FengYuchen1314/backend/actions/runs/33976781168) 汇总时仍在构建/发布镜像，后端验证与前端编译已完成。该任务结果不能替代 VPS 界面验收；当前隔离面板仍是此前已验收版本，尚未升级到这批修复。
 
-本机测试使用已安装的 Backend tsx 4.21.0；Frontend 锁定的 tsx 4.23.13 由 Actions 安装验证。应用继续只在 GitHub Actions 编译。下一步是取得本轮前端检查和精确前后端配对镜像，保留隔离面板数据后做浏览器验收，再进入完整前端逻辑重写与 HeroUI 迁移。
+本机测试使用已安装的 Backend tsx 4.21.0；应用只在 GitHub Actions 编译。本次按用户要求总结并上传，未继续开发、安装 HeroUI 或部署 VPS。后续先确认精确配对镜像，备份并保留隔离面板数据后做浏览器验收，再进入完整前端逻辑重写与 HeroUI 迁移。
+
+完整改造范围见 [HeroUI 迁移范围与验收清单](heroui-migration-scope.md)，该清单不是迁移完成报告。
