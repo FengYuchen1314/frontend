@@ -17,13 +17,10 @@ import { useTranslation } from 'react-i18next'
 import { PiShuffleDuotone, PiSignpostDuotone } from 'react-icons/pi'
 
 import { useRegister } from '@shared/api/hooks'
-import { useAuth } from '@shared/hooks/use-auth'
 import { handleFormErrors } from '@shared/utils/misc'
 
 export const RegisterFormFeature = () => {
     const { t } = useTranslation()
-
-    const { setIsAuthenticated } = useAuth()
 
     const { copy, copied, error } = useClipboard()
 
@@ -46,7 +43,6 @@ export const RegisterFormFeature = () => {
 
     const { mutate: register, isPending: isLoading } = useRegister({
         mutationFns: {
-            onSuccess: () => setIsAuthenticated(true),
             onError: (error) => {
                 handleFormErrors(form, error)
             }

@@ -6,21 +6,13 @@ import { clearQueryClient } from '@shared/api'
 import { ROUTES } from '@shared/constants'
 import { logoutEvents } from '@shared/emitters'
 import { resetAllStores } from '@shared/hocs/store-wrapper'
-import { useAuth } from '@shared/hooks'
 import { LanguagePicker } from '@shared/ui/language-picker/language-picker.shared'
 
-import { removeToken } from '@entities/auth'
-
 export const HeaderButtons = () => {
-    const { setIsAuthenticated } = useAuth()
     const navigate = useNavigate()
 
     const handleLogout = () => {
         logoutEvents.emit()
-        setIsAuthenticated(false)
-        removeToken()
-        resetAllStores()
-        clearQueryClient()
         navigate(ROUTES.AUTH.LOGIN)
     }
 

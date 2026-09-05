@@ -36,7 +36,6 @@ import {
 } from './ssh-crypto'
 import { parseSshPrivateKey, toOpenSshPublicKey } from './ssh-private-key'
 import {
-    clearVault,
     destroyVault,
     deleteSnippet,
     getAllKnownHosts,
@@ -50,14 +49,11 @@ import {
     getOrCreateDeviceKey,
     getVaultMeta,
     putConnectionProfile,
-    putConnectionProfiles,
     putKnownHost,
-    putKnownHosts,
     putNodeKey,
-    putNodeKeys,
     putSnippet,
-    putSnippets,
-    putVaultMeta
+    putVaultMeta,
+    restoreVault
 } from './ssh-vault.db'
 import {
     decodeVaultFile,
@@ -583,16 +579,14 @@ export const useSshVaultStore = create<IActions & IState>()(
                                 operation.assertCurrent()
                                 // Once the restore batch starts, finish its encrypted records before
                                 // allowing a newer reset/restore to run. Never publish canceled keys.
-                                await clearVault()
-                                await putVaultMeta({
-                                    createdAt: backup.createdAt,
-                                    version: 1,
-                                    wrappedDataKey: backup.wrappedDataKey
-                                })
-                                await putNodeKeys(records.keys)
-                                await putKnownHosts(records.hosts)
-                                await putSnippets(records.snippets ?? [])
-                                await putConnectionProfiles(records.profiles ?? [])
+                                await restoreVault(
+                                    {
+                                        createdAt: backup.createdAt,
+                                        version: 1,
+                                        wrappedDataKey: backup.wrappedDataKey
+                                    },
+                                    records
+                                )
                                 operation.assertCurrent()
                                 retainRawDataKey(rawDataKey)
                                 set({

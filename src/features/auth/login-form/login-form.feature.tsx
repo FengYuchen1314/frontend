@@ -5,13 +5,10 @@ import { useTranslation } from 'react-i18next'
 import { PiSignInDuotone } from 'react-icons/pi'
 
 import { useLogin } from '@shared/api/hooks'
-import { useAuth } from '@shared/hooks/use-auth'
 import { handleFormErrors } from '@shared/utils/misc'
 
 export const LoginFormFeature = () => {
     const { t } = useTranslation()
-
-    const { setIsAuthenticated } = useAuth()
 
     const form = useForm({
         mode: 'uncontrolled',
@@ -30,9 +27,6 @@ export const LoginFormFeature = () => {
                 }
             },
             {
-                onSuccess: () => {
-                    setIsAuthenticated(true)
-                },
                 onError: (error) => handleFormErrors(form, error)
             }
         )

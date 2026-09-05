@@ -24,3 +24,14 @@
 本机测试使用已安装的 Backend tsx 4.21.0；应用只在 GitHub Actions 编译。本次按用户要求总结并上传，未继续开发、安装 HeroUI 或部署 VPS。后续先确认精确配对镜像，备份并保留隔离面板数据后做浏览器验收，再进入完整前端逻辑重写与 HeroUI 迁移。
 
 完整改造范围见 [HeroUI 迁移范围与验收清单](heroui-migration-scope.md)，该清单不是迁移完成报告。
+
+## 后续补充修复（2026-09-06）
+
+`eb8f1790` 的配套镜像已成功并完成部分真实浏览器检查，见 [镜像与浏览器记录](bugfix-browser-acceptance.md)。下列新改动不混入该版本证据：
+
+- AuthProvider 直接从现有 token store 派生认证状态，删除 7 处手动 setter 接线。注销统一清理 token、业务 store 和 Query/Mutation 缓存，增加同步重入保护；保留客户端初始化、SSR/hydration 隔离及密码、注册、OAuth、Passkey 工作流。
+- 内部组入站草稿按实体和打开周期隔离；同组 refetch 不覆盖已编辑选择，空选择也保留。分组和平铺共用草稿，失败保存不丢输入，旧保存成功不能关闭后来打开或继续编辑的抽屉。
+- Vault DB 改为等事务 `complete` 才报告成功；reset 跨六个 store 原子清空但保留 schema，避免不可取消的延迟删库。恢复在一个事务中替换全部加密记录，失败回滚并保留旧设备 key；blocked 升级明确失败并取消迟到升级。原加密算法、参数及备份格式不变。
+- 默认回归共 166 项通过：基础/表单/列表 64 项，加上会话、认证、Vault、Passkey 102 项。新增认证 19 项、入站草稿 11 项、Vault 持久化 10 项。全仓 TypeScript 和 lint 已通过。
+
+Vault 持久化使用固定 fake-indexeddb 6.2.5；认证和草稿测试执行真实 hook、生产事件逻辑或 SSR，不冒充浏览器端到端测试。新增补充修复的 Actions、新镜像和真实浏览器验证仍待执行。

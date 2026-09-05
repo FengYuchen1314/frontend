@@ -12,6 +12,14 @@ const STORE_DEVICE = 'device'
 const STORE_PROFILES = 'profiles'
 const STORE_SNIPPETS = 'snippets'
 const META_ID = 'vault'
+const ALL_STORES = [
+    STORE_META,
+    STORE_KEYS,
+    STORE_HOSTS,
+    STORE_PROFILES,
+    STORE_SNIPPETS,
+    STORE_DEVICE
+]
 
 export interface IVaultMeta {
     createdAt: string
@@ -66,11 +74,28 @@ export interface IKnownHostRecord {
     payload: IEncryptedBlob
 }
 
+export interface IVaultRestoreRecords {
+    hosts: IKnownHostRecord[]
+    keys: INodeKeyRecord[]
+    profiles?: IConnectionProfileRecord[]
+    snippets?: ISnippetRecord[]
+}
+
 function open(): Promise<IDBDatabase> {
     return new Promise((resolve, reject) => {
         const request = indexedDB.open(DB_NAME, DB_VERSION)
+        let canceled = false
+
+        request.onblocked = () => {
+            canceled = true
+            reject(new Error('Vault database is blocked. Close other vault tabs and retry.'))
+        }
 
         request.onupgradeneeded = () => {
+            if (canceled) {
+                request.transaction?.abort()
+                return
+            }
             const db = request.result
             if (!db.objectStoreNames.contains(STORE_META)) {
                 db.createObjectStore(STORE_META, { keyPath: 'id' })
@@ -92,9 +117,48 @@ function open(): Promise<IDBDatabase> {
             }
         }
 
-        request.onsuccess = () => resolve(request.result)
+        request.onsuccess = () => {
+            const db = request.result
+            db.onversionchange = () => db.close()
+            // A blocked open cannot be canceled. Do not retain a late connection.
+            if (canceled) db.close()
+            else resolve(db)
+        }
         request.onerror = () => reject(request.error)
     })
+}
+
+async function transact<T>(
+    stores: string | string[],
+    mode: IDBTransactionMode,
+    action: (transaction: IDBTransaction) => T
+): Promise<T> {
+    const db = await open()
+
+    try {
+        return await new Promise<T>((resolve, reject) => {
+            const transaction = db.transaction(stores, mode)
+            let result: T
+            let failure: unknown
+            // Request success is not commit: a later request or storage failure can
+            // still abort the entire transaction. Settle only at its terminal event.
+            transaction.oncomplete = () => resolve(result)
+            transaction.onabort = () =>
+                reject(failure ?? transaction.error ?? new Error('Vault transaction aborted'))
+            transaction.onerror = (event) => {
+                failure ??= (event.target as IDBRequest).error
+            }
+            try {
+                result = action(transaction)
+            } catch (error) {
+                failure = error
+                // A synchronous DataCloneError must roll back already queued clears/puts.
+                transaction.abort()
+            }
+        })
+    } finally {
+        db.close()
+    }
 }
 
 async function run<T>(
@@ -102,27 +166,15 @@ async function run<T>(
     mode: IDBTransactionMode,
     action: (store: IDBObjectStore) => IDBRequest<T>
 ): Promise<T> {
-    const db = await open()
-
-    try {
-        return await new Promise<T>((resolve, reject) => {
-            const request = action(db.transaction(store, mode).objectStore(store))
-            request.onsuccess = () => resolve(request.result)
-            request.onerror = () => reject(request.error)
-        })
-    } finally {
-        db.close()
-    }
+    const request = await transact(store, mode, (transaction) =>
+        action(transaction.objectStore(store))
+    )
+    return request.result
 }
 
-export const destroyVault = (): Promise<void> =>
-    new Promise((resolve) => {
-        const request = indexedDB.deleteDatabase(DB_NAME)
-
-        request.onsuccess = () => resolve()
-        request.onerror = () => resolve()
-        request.onblocked = () => resolve()
-    })
+// Keep the empty schema. deleteDatabase can remain blocked and later delete a
+// newly created vault; clearing every store atomically has no deferred deletion.
+export const destroyVault = (): Promise<void> => clearVault()
 
 export const getVaultMeta = () =>
     run<IVaultMeta | undefined>(STORE_META, 'readonly', (store) => store.get(META_ID))
@@ -183,18 +235,27 @@ export async function getOrCreateDeviceKey(): Promise<CryptoKey> {
     }
 }
 
-export const clearVault = async (): Promise<void> => {
-    for (const store of [
-        STORE_META,
-        STORE_KEYS,
-        STORE_HOSTS,
-        STORE_PROFILES,
-        STORE_SNIPPETS,
-        STORE_DEVICE
-    ]) {
-        await run(store, 'readwrite', (objectStore) => objectStore.clear())
-    }
-}
+export const clearVault = (): Promise<void> =>
+    transact(ALL_STORES, 'readwrite', (transaction) => {
+        for (const store of ALL_STORES) transaction.objectStore(store).clear()
+    })
+
+export const restoreVault = (
+    meta: Omit<IVaultMeta, 'id'>,
+    records: IVaultRestoreRecords
+): Promise<void> =>
+    transact(ALL_STORES, 'readwrite', (transaction) => {
+        // Queue the complete encrypted replacement synchronously in one transaction.
+        // An abort preserves the old metadata, all collections and the device key.
+        for (const store of ALL_STORES) transaction.objectStore(store).clear()
+        transaction.objectStore(STORE_META).put({ ...meta, id: META_ID })
+        for (const record of records.keys) transaction.objectStore(STORE_KEYS).put(record)
+        for (const record of records.hosts) transaction.objectStore(STORE_HOSTS).put(record)
+        for (const record of records.snippets ?? [])
+            transaction.objectStore(STORE_SNIPPETS).put(record)
+        for (const record of records.profiles ?? [])
+            transaction.objectStore(STORE_PROFILES).put(record)
+    })
 
 export const putKnownHosts = async (records: IKnownHostRecord[]): Promise<void> => {
     for (const record of records) await putKnownHost(record)

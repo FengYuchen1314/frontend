@@ -15,7 +15,6 @@ import {
     subscribeSessionChanges
 } from '@shared/api/axios'
 import { usePasskeyAuthenticationOptions, usePasskeyAuthenticationVerify } from '@shared/api/hooks'
-import { useAuth } from '@shared/hooks/use-auth'
 
 import { setToken } from '@entities/auth/session-store'
 
@@ -50,8 +49,6 @@ export const PasskeyLoginButtonFeature = (props: IProps) => {
         }
     }, [flow])
 
-    const { setIsAuthenticated } = useAuth()
-
     const { mutateAsync: verifyAuthentication } = usePasskeyAuthenticationVerify()
     const { refetch } = usePasskeyAuthenticationOptions()
 
@@ -74,7 +71,6 @@ export const PasskeyLoginButtonFeature = (props: IProps) => {
                 onSuccess: (data) => {
                     setIsLoading(false)
                     setToken({ token: data.accessToken })
-                    setIsAuthenticated(true)
                     notifications.show({
                         title: 'Passkey Verified',
                         message: 'Passkey authenticated successfully',

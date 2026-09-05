@@ -7,13 +7,12 @@ import { useNavigate, useParams, useSearchParams } from 'react-router'
 
 import { useOauth2Callback } from '@shared/api/hooks'
 import { ROUTES } from '@shared/constants'
-import { useAuth } from '@shared/hooks/use-auth'
+import { logoutEvents } from '@shared/emitters'
 import { Page } from '@shared/ui/page'
 import { consumeReturnTo } from '@shared/utils/return-to.util'
 
 export const Oauth2CallbackPage = () => {
     const { provider } = useParams()
-    const { setIsAuthenticated } = useAuth()
 
     const [searchParams] = useSearchParams()
     const navigate = useNavigate()
@@ -24,8 +23,6 @@ export const Oauth2CallbackPage = () => {
     const { mutate: oauth2Callback, isPending } = useOauth2Callback({
         mutationFns: {
             onSuccess: () => {
-                setIsAuthenticated(true)
-
                 navigate(consumeReturnTo() ?? ROUTES.DASHBOARD.HOME)
             },
             onError: (error) => {
@@ -34,7 +31,7 @@ export const Oauth2CallbackPage = () => {
                     message: error.message,
                     color: 'red'
                 })
-                setIsAuthenticated(false)
+                logoutEvents.emit()
 
                 navigate(ROUTES.AUTH.LOGIN)
             }

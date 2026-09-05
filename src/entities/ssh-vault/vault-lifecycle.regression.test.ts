@@ -34,6 +34,8 @@ function deferred() {
     return { promise, resolve }
 }
 
+// Deterministic pause points for lifecycle races. Transaction rollback itself is
+// covered separately with fake-indexeddb in vault-persistence.regression.test.ts.
 function memoryDatabase() {
     const stores = new Map<string, Map<string, unknown>>()
     const effects: string[] = []
@@ -47,14 +49,19 @@ function memoryDatabase() {
         if (!stores.has(name)) stores.set(name, new Map())
         return stores.get(name)!
     }
-    const request = (store: string, method: string, work: () => unknown) => {
+    const request = (
+        store: string,
+        method: string,
+        work: () => unknown,
+        schedule: (task: () => Promise<void>) => void = queueMicrotask
+    ) => {
         const result: {
             result?: unknown
             onsuccess?: () => void
             onerror?: () => void
             error?: unknown
         } = {}
-        queueMicrotask(async () => {
+        schedule(async () => {
             if (pause?.store === store && pause.method === method) {
                 const pending = pause
                 pause = null
@@ -72,6 +79,76 @@ function memoryDatabase() {
         })
         return result
     }
+    const transaction = (scope: string | string[], mode: IDBTransactionMode) => {
+        const names = typeof scope === 'string' ? [scope] : scope
+        const staged = new Map(names.map((name) => [name, new Map(table(name))]))
+        let pending = 0
+        let aborted = false
+        let queue = Promise.resolve()
+        const tx: {
+            oncomplete?: () => void
+            onabort?: () => void
+            error?: unknown
+            abort(): void
+            objectStore(name: string): ReturnType<typeof objectStore>
+        } = {
+            abort() {
+                aborted = true
+                queueMicrotask(() => tx.onabort?.())
+            },
+            objectStore
+        }
+        const schedule = (task: () => Promise<void>) => {
+            pending++
+            queue = queue.then(async () => {
+                if (aborted) return
+                await task()
+                if (--pending === 0 && !aborted) {
+                    if (mode === 'readwrite') {
+                        for (const name of names) stores.set(name, staged.get(name)!)
+                    }
+                    tx.oncomplete?.()
+                }
+            })
+        }
+        function objectStore(name: string) {
+            const records = staged.get(name)!
+            const enqueue = (method: string, work: () => unknown) =>
+                request(
+                    name,
+                    method,
+                    () => {
+                        try {
+                            return work()
+                        } catch (error) {
+                            tx.error = error
+                            tx.abort()
+                            throw error
+                        }
+                    },
+                    schedule
+                )
+            return {
+                get: (key: string) => enqueue('get', () => structuredClone(records.get(key))),
+                getAll: () => enqueue('getAll', () => structuredClone([...records.values()])),
+                put: (record: Record<string, unknown>, key?: string) =>
+                    enqueue('put', () =>
+                        records.set(
+                            key ?? String(record.id ?? record.nodeUuid),
+                            structuredClone(record)
+                        )
+                    ),
+                add: (record: unknown, key: string) =>
+                    enqueue('add', () => {
+                        if (records.has(key)) throw new Error('Fixture duplicate key')
+                        records.set(key, record)
+                    }),
+                delete: (key: string) => enqueue('delete', () => records.delete(key)),
+                clear: () => enqueue('clear', () => records.clear())
+            }
+        }
+        return tx
+    }
     return {
         effects,
         table,
@@ -84,34 +161,8 @@ function memoryDatabase() {
             open: () =>
                 request('', 'open', () => ({
                     close() {},
-                    transaction: (name: string) => ({
-                        objectStore: () => ({
-                            get: (key: string) =>
-                                request(name, 'get', () => structuredClone(table(name).get(key))),
-                            getAll: () =>
-                                request(name, 'getAll', () =>
-                                    structuredClone([...table(name).values()])
-                                ),
-                            put: (record: Record<string, unknown>, key?: string) =>
-                                request(name, 'put', () =>
-                                    table(name).set(
-                                        key ?? String(record.id ?? record.nodeUuid),
-                                        structuredClone(record)
-                                    )
-                                ),
-                            add: (record: unknown, key: string) =>
-                                request(name, 'add', () => {
-                                    if (table(name).has(key))
-                                        throw new Error('Fixture duplicate key')
-                                    table(name).set(key, record)
-                                }),
-                            delete: (key: string) =>
-                                request(name, 'delete', () => table(name).delete(key)),
-                            clear: () => request(name, 'clear', () => table(name).clear())
-                        })
-                    })
-                })),
-            deleteDatabase: () => request('', 'destroy', () => stores.clear())
+                    transaction
+                }))
         }
     }
 }
@@ -265,7 +316,7 @@ test('a pending export or metadata refresh cannot publish into a replacement ses
 
 test('reset drops live keys synchronously and cannot be undone by a pending unlock', async () => {
     assert.equal(await actions().unlock(phrase), true)
-    const pending = db.pause('', 'destroy')
+    const pending = db.pause('meta', 'clear')
     const reset = actions().reset()
     assert.equal(useSshVaultStore.getState().dataKey, null)
     await pending.entered.promise

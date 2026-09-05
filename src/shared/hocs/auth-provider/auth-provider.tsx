@@ -1,6 +1,6 @@
-import consola from 'consola/browser'
-import { createContext, ReactNode, useEffect, useMemo, useState } from 'react'
+import { createContext, ReactNode, useEffect, useMemo, useSyncExternalStore } from 'react'
 
+import { clearQueryClient } from '@shared/api/query-client'
 import { logoutEvents } from '@shared/emitters'
 import { resetAllStores } from '@shared/hocs/store-wrapper'
 
@@ -9,7 +9,6 @@ import { removeToken, useToken } from '@entities/auth'
 interface AuthContextValues {
     isAuthenticated: boolean
     isInitialized: boolean
-    setIsAuthenticated: (isAuthenticated: boolean) => void
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -19,57 +18,49 @@ interface AuthProviderProps {
     children: ReactNode
 }
 
+// localStorage persistence is synchronous before the provider renders. Only
+// server rendering/hydration needs a closed initialization snapshot.
+const subscribeInitialization = () => () => {}
+const getClientInitialized = () => true
+const getServerInitialized = () => false
+
 export function AuthProvider({ children }: AuthProviderProps) {
-    const [isAuthenticated, setIsAuthenticated] = useState(false)
-    const [isInitialized, setIsInitialized] = useState(false)
-    const [isLoggedOut, setIsLoggedOut] = useState(false)
+    const isInitialized = useSyncExternalStore(
+        subscribeInitialization,
+        getClientInitialized,
+        getServerInitialized
+    )
     const token = useToken()
-
-    const logoutUser = () => {
-        if (isLoggedOut) {
-            return
-        }
-
-        try {
-            setIsLoggedOut(true)
-            setIsAuthenticated(false)
-            removeToken()
-            resetAllStores()
-        } finally {
-            setIsLoggedOut(false)
-        }
-    }
+    const isAuthenticated = Boolean(token)
 
     useEffect(() => {
+        // Logout is synchronous. A closure lock protects nested emissions;
+        // React state would not update until after this listener has returned.
+        let isLoggingOut = false
         const unsubscribe = logoutEvents.subscribe(() => {
-            logoutUser()
+            if (isLoggingOut) return
+            isLoggingOut = true
+            try {
+                try {
+                    removeToken()
+                } finally {
+                    try {
+                        resetAllStores()
+                    } finally {
+                        // Also clear when already anonymous or storage persistence fails.
+                        clearQueryClient()
+                    }
+                }
+            } finally {
+                isLoggingOut = false
+            }
         })
 
         return unsubscribe
     }, [])
 
-    useEffect(() => {
-        ;(async () => {
-            if (!token) {
-                setIsAuthenticated(false)
-                setIsInitialized(true)
-                return
-            }
-
-            try {
-                setIsAuthenticated(true)
-                setIsLoggedOut(false)
-            } catch (error) {
-                consola.error(error)
-                logoutUser()
-            } finally {
-                setIsInitialized(true)
-            }
-        })()
-    }, [])
-
     const value = useMemo(
-        () => ({ isAuthenticated, isInitialized, setIsAuthenticated }),
+        () => ({ isAuthenticated, isInitialized }),
         [isAuthenticated, isInitialized]
     )
 

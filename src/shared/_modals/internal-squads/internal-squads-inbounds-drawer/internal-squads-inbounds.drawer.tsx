@@ -16,7 +16,7 @@ import {
     Tooltip
 } from '@mantine/core'
 import { GetConfigProfilesCommand } from '@remnawave/backend-contract'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { PiCheck, PiCopy, PiList, PiTag, PiTreeView, PiUsers } from 'react-icons/pi'
 import { TbCirclesRelation, TbDeviceFloppy, TbSearch } from 'react-icons/tb'
@@ -37,6 +37,7 @@ import { LoaderModalShared } from '@shared/ui/loader-modal'
 import { BaseOverlayHeader } from '@shared/ui/overlays/base-overlay-header'
 import { formatInt } from '@shared/utils/misc'
 
+import { useInternalSquadInboundsDraft } from './internal-squads-inbounds-draft'
 import classes from './internal-squads-inbounds.module.css'
 
 interface IProps {
@@ -72,8 +73,18 @@ export const InternalSquadsInboundsDrawer = NiceModal.create((props: IProps) => 
         return () => clearTimeout(timer)
     }, [searchQuery])
 
-    const [selectedInbounds, setSelectedInbounds] = useState<Set<string>>(
-        new Set(internalSquad ? internalSquad.inbounds.map((inbound) => inbound.uuid) : [])
+    const { selectedInbounds, setSelectedInbounds, revision } = useInternalSquadInboundsDraft(
+        squadUuid,
+        modal.visible,
+        internalSquad?.uuid === squadUuid ? internalSquad.inbounds : undefined
+    )
+    const editGeneration = useRef(0)
+
+    useLayoutEffect(
+        () => () => {
+            editGeneration.current += 1
+        },
+        [squadUuid, modal.visible, revision]
     )
 
     const [openAccordions, setOpenAccordions] = useState<Set<string>>(new Set([]))
@@ -148,7 +159,7 @@ export const InternalSquadsInboundsDrawer = NiceModal.create((props: IProps) => 
                 return next
             })
         },
-        []
+        [setSelectedInbounds]
     )
 
     const handleSelectAllInbounds = useCallback(
@@ -160,7 +171,7 @@ export const InternalSquadsInboundsDrawer = NiceModal.create((props: IProps) => 
                 setSelectedInbounds((prev) => new Set([...prev, ...profileInbounds]))
             }
         },
-        [filteredProfiles]
+        [filteredProfiles, setSelectedInbounds]
     )
 
     const handleUnselectAllInbounds = useCallback(
@@ -176,14 +187,8 @@ export const InternalSquadsInboundsDrawer = NiceModal.create((props: IProps) => 
                 })
             }
         },
-        [filteredProfiles]
+        [filteredProfiles, setSelectedInbounds]
     )
-
-    useEffect(() => {
-        if (internalSquad?.inbounds) {
-            setSelectedInbounds(new Set(internalSquad.inbounds.map((inbound) => inbound.uuid)))
-        }
-    }, [internalSquad?.inbounds])
 
     const { mutate: updateInternalSquad, isPending: isUpdatingInternalSquad } =
         useUpdateInternalSquad({
@@ -198,23 +203,28 @@ export const InternalSquadsInboundsDrawer = NiceModal.create((props: IProps) => 
                         }).queryKey,
                         data
                     )
-                    hide()
                 }
             }
         })
 
     const handleUpdateInternalSquad = () => {
-        if (!internalSquad?.uuid) return
+        if (!modal.visible || internalSquad?.uuid !== squadUuid) return
+        const saveGeneration = editGeneration.current
         updateInternalSquad({
             variables: {
-                uuid: internalSquad.uuid,
+                uuid: squadUuid,
                 inbounds: Array.from(selectedInbounds)
+            },
+            mutationFns: {
+                onSuccess: () => {
+                    if (editGeneration.current === saveGeneration) hide()
+                }
             }
         })
     }
 
     const renderDrawerContent = () => {
-        if (!internalSquad) return null
+        if (!internalSquad || internalSquad.uuid !== squadUuid) return null
 
         return (
             <Stack

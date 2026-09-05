@@ -69,7 +69,6 @@ test('a session change during the authenticator prompt must not submit its old a
             verified++
             return { accessToken: 'fixture-token' }
         },
-        setIsAuthenticated: () => {},
         notifications: { show: () => {} },
         getSessionGeneration: () => generation,
         assertSessionGeneration: (expected: number) => {
@@ -98,7 +97,6 @@ test('failed options refetch must not reuse cached options or open the authentic
             return { id: 'fixture' }
         },
         verifyAuthentication: async () => ({ accessToken: 'fixture-token' }),
-        setIsAuthenticated: () => {},
         notifications: { show: () => {} },
         getSessionGeneration: () => 0,
         assertSessionGeneration: () => {}
@@ -119,7 +117,6 @@ test('a current successful production click commits its verified token exactly o
             generation++
             events.push(token)
         },
-        setIsAuthenticated: (value: boolean) => events.push(`authenticated:${value}`),
         notifications: { show: () => events.push('success-notice') },
         getSessionGeneration: () => generation
     })
@@ -128,7 +125,6 @@ test('a current successful production click commits its verified token exactly o
         'loading:true',
         'loading:false',
         'verified-token',
-        'authenticated:true',
         'success-notice',
         'loading:false'
     ])
@@ -210,9 +206,6 @@ test('ordinary current authenticator cancellation keeps the existing user notifi
         },
         verifyAuthentication: async () => {
             throw new Error('must not verify')
-        },
-        setIsAuthenticated: () => {
-            throw new Error('must not log in')
         },
         notifications: { show: ({ message }: { message: string }) => events.push(message) },
         getSessionGeneration: () => 0
