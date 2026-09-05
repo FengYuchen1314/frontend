@@ -17,6 +17,7 @@ import { CodeEditor, editorClasses, EditorFooter, EditorStatusBar } from '@share
 import { FullscreenToggleButton, fullscreenClasses } from '@shared/ui/fullscreen-toggle-button'
 import { LoaderModalShared } from '@shared/ui/loader-modal'
 import { BaseOverlayHeader } from '@shared/ui/overlays/base-overlay-header'
+import { isMieruProfileConfig } from '@shared/utils/config-profile-runtime'
 import { preventBackScroll } from '@shared/utils/misc'
 
 import styles from './ConfigEditor.module.css'
@@ -27,11 +28,7 @@ export function ConfigEditorWidget(props: IProps) {
     const monaco = useMonaco()
 
     const { configProfile, isWasmCrashed, isWasmRestarting, onRestartWasm, snippets } = props
-    const isMieruConfig =
-        typeof configProfile.config === 'object' &&
-        configProfile.config !== null &&
-        !Array.isArray(configProfile.config) &&
-        (configProfile.config as Record<string, unknown>).runtime === 'MIERU'
+    const isMieruConfig = isMieruProfileConfig(configProfile.config)
 
     const [result, setResult] = useState('')
     const [isConfigValid, setIsConfigValid] = useState(true)

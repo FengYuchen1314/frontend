@@ -21,7 +21,7 @@
     "serve": "NODE_ENV=production tsc && vite build && vite preview --port 3333",
     "serve:dev": "tsc && vite build && vite preview --port 3333",
     "typecheck": "tsc --noEmit",
-    "test": "node --test --experimental-strip-types src/shared/constants/managed-protocols.test.ts src/features/dashboard/topology/lib/topology-graph.test.ts src/features/dashboard/topology/lib/topology-locales.test.ts src/features/dashboard/topology/lib/topology-revision.test.ts src/shared/_modals/nodes/create-node-modal/create-node-defaults.test.ts src/features/dashboard/topology/lib/topology-accessibility.test.ts src/features/dashboard/topology/lib/topology-draft-ui.test.ts src/shared/ui/forms/hosts/base-host-form/mieru-port-mapping.test.ts",
+    "test": "node --test --experimental-strip-types src/shared/constants/managed-protocols.test.ts src/features/dashboard/topology/lib/topology-graph.test.ts src/features/dashboard/topology/lib/topology-locales.test.ts src/features/dashboard/topology/lib/topology-revision.test.ts src/shared/_modals/nodes/create-node-modal/create-node-defaults.test.ts src/features/dashboard/topology/lib/topology-accessibility.test.ts src/features/dashboard/topology/lib/topology-draft-ui.test.ts src/shared/ui/forms/hosts/base-host-form/mieru-port-mapping.test.ts src/shared/utils/config-profile-runtime.test.ts",
     "generate-pwa-assets": "pwa-assets-generator --preset minimal-2023 public/favicons/logo.svg",
     "toc": "i18next-resources-for-ts toc -i ./public/locales/en -o @types/resources.ts",
     "crowdin:download": "crowdin download translations --language=af --branch=dev",
