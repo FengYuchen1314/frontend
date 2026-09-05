@@ -84,3 +84,30 @@ The Mieru preset audit found its generated port 443 fails both the existing brow
 backend listener schema (minimum 1025). The default is now 24443, with an added port-range assertion
 that failed before the correction. The backend startup parser also needs the corresponding
 Mieru-path correction; a frontend preset fix alone is not restart acceptance.
+
+## Confirmed paired-image regression and remaining label fix
+
+Backend `8f51bd6da25811ff323067c71d01b6f865fb93ab`, frontend
+`260b6c407d4f3311ad4e6dff39e1b79f523acdda`, Actions image
+`sha256:36dc9ef42e6a5925ca3742ca52e16e7b9d57e5964c4ac11a3b28bfd306087d5f`, passed the actual
+VPS upgrade and fresh-install restart checks. Draft and published graph records survived the
+real production entrypoint unchanged; the browser restored the saved two-server balance graph.
+
+In the upgraded browser, an agent-authored version-2 draft conflicted after a separate API
+editor saved version 3. Save retained the unsaved name and graph. Reload Latest opened the
+existing discard modal; Cancel preserved the draft and version 2. Reopening and confirming
+loaded the remote name and version 3, clearing the dirty/conflict state. This is actual browser
+acceptance of both modal branches, not only a source-wiring assertion.
+
+That test additionally reproduced a display inconsistency: the saved-record selector retained
+the old name after the detail loaded the renamed record. UUID and stored data remained correct.
+The reload handler now refreshes the list after accepting a current detail response. A regression
+executes the actual handler with controlled query functions: it fails before this change, passes
+afterward, and verifies stale responses neither replace drafts nor initiate this list refresh.
+This additional label correction still needs its own paired-image browser acceptance.
+
+The same 36dc image passed real browser Mieru preset creation: choose Mieru TCP in the managed
+template picker, create a disposable profile, and open its editor. The editor reported the
+configuration valid. Separate authenticated API readback confirmed `runtime: MIERU`, one TCP
+listener and one Mieru inbound, both on port 24443. This is profile creation/validation, not
+Agent startup or Mieru client traffic.

@@ -611,7 +611,8 @@ export function TopologyPageConnector() {
     const {
         data: topologyList,
         error: listError,
-        isLoading: isTopologiesLoading
+        isLoading: isTopologiesLoading,
+        refetch: refetchList
     } = useGetTopologies()
     const [selectedUuid, setSelectedUuid] = useState<null | string>(null)
     const {
@@ -1035,7 +1036,10 @@ export function TopologyPageConnector() {
     const handleReloadLatest = async () => {
         const isCurrent = draftRequestsRef.current.begin('reload')
         const result = await refetchSelected()
-        if (isCurrent() && result.data?.uuid === selectedUuid) loadTopology(result.data)
+        if (isCurrent() && result.data?.uuid === selectedUuid) {
+            loadTopology(result.data)
+            void refetchList()
+        }
     }
 
     const handleDelete = () => {
