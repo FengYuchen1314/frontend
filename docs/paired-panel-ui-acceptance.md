@@ -111,3 +111,24 @@ template picker, create a disposable profile, and open its editor. The editor re
 configuration valid. Separate authenticated API readback confirmed `runtime: MIERU`, one TCP
 listener and one Mieru inbound, both on port 24443. This is profile creation/validation, not
 Agent startup or Mieru client traffic.
+
+## Label-refresh image accepted
+
+The follow-up pair, backend `620da70fd2ae4ea7ee3a0c20c7b6bf6780c6215e` and frontend
+`65da671701a092e0bea20135064cce19d5960b3b`, passed
+[Actions 33939882005](https://github.com/FengYuchen1314/backend/actions/runs/33939882005), image
+`sha256:5c008e08d8bab5d627c71df38caae947976681a2fdf0913bc5676c9d1f84ff5f`.
+The exact image metadata was verified before upgrading the owned browser fixture. Both topology
+records and the browser-created Mieru profile survived the production entrypoint unchanged.
+
+Actual browser testing then repeated the conflict with a version-3 draft and a separately saved
+version 4. Cancel retained the local name, graph and version. Confirm loaded version 4 and updated
+both the detail name and saved-record selector to `Browser Two Server Balance Labels Refreshed`;
+dirty/conflict state cleared. API readback still confirmed two servers, five edges and supported
+Mihomo round-robin preview. The display regression is resolved in this pair.
+
+All 30 frontend tests, typecheck and changed-file lint/format checks passed, as did frontend CI.
+Whole-tree lint remains the separately recorded 16 errors and 12 warnings. These acceptance
+records do not make the entire original feature request complete. In particular, the Mieru Host
+form currently describes entry/IX mapping but still lacks the explicitly requested one-to-one
+versus manual IX-port choice and its corresponding input workflow.
