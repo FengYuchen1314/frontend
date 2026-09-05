@@ -15,9 +15,13 @@ when the supplied defaults have not changed. The effect repeatedly triggers anot
 
 The correction puts port `2222` and server type `PUBLIC_DIRECT` in `initialValues` and removes
 the resetting effect. User-entered values and server-type selections are not reset on renders.
-Two source-structure regression checks fail before this change and pass after it. They are not
-a replacement for browser rendering: rebuild the exact frontend/backend pair in Actions and
-retest modal opening, typed values, server-type changes and returning from the next step.
+Two source-structure regression checks fail before this change and pass after it. The Actions
+pair backend `3bdbee41463cafc10396e53c37cde7aed6fe6680` / frontend
+`c639ce75b8152fb30f784738ed7fbcf62c6f6c6c`, image
+`sha256:9ff79bc5c47f0546e2d90242653a1ca07ca2327c3ae0333008741e95308e3544`, passed the VPS
+browser regression: modal opens normally, defaults are public-direct/2222, custom name/IP/2444
+and broadband type survive next/back, and the broadband profile picker shows only SOCKS.
+No node deployment or bootstrap token creation was performed in this form-only regression.
 
 Remaining UI acceptance includes reverse-proxy drafts/conflicts and topology drag/drop,
 save/reload and dirty-state behavior. No completed end-to-end UI acceptance is claimed here.
@@ -35,7 +39,11 @@ the ancestor's disabled semantics incorrectly reported its controls as disabled 
 tooling; native clicking was still possible. Fixed
 ENTRY/EXIT cards now omit the draggable DOM ref; movable cards retain it, and the fixed-node
 movement rule is unchanged. A source regression fails before that one-line change. Fresh-image
-browser confirmation of the corrected accessibility tree is still required.
+browser confirmation passed in backend `3bdbee41463cafc10396e53c37cde7aed6fe6680` / frontend
+`d6bc1fa1c442572de287d6812241a1218059140e`, image
+`sha256:2e0c90900cba2ab4b610f554bd70d830da891f9ce1997a435b6a8b448c54c870`: the entry next-hop
+control is enabled and its live DOM has no `aria-disabled=true` ancestor. Both fixed cards appear
+as containers, not disabled draggable buttons.
 
 Local tests and type-check pass for the changes. Changed-file lint passes, while whole-tree
 lint reports 16 errors and 12 warnings in other files; do not report whole-tree lint as clean.
@@ -47,3 +55,24 @@ distinct physical servers, three edges, an unpublished draft and successful serv
 The browser preview displayed a supported Mihomo injection with the broadband proxy's
 `dialer-proxy` set to the public Vision proxy. This verifies graph authoring and preview wiring,
 not a complete user subscription or actual client traffic.
+
+## Restart and additional browser checks
+
+Restore after upgrading the panel found the saved graphs gone. This was confirmed by the API
+and reproduced in a separate fresh fixture: one saved graph becomes zero after a real container
+restart, with the seed log reporting one unknown template deleted. The backend startup seeder
+mistakenly deletes the internal topology template type; backend `22e2ce88554470c0448f7818ef5583ea1d3c7047`
+corrects this. Earlier images are not safe for deployment despite passing create/read tests.
+New-image restart preservation is still required; do not equate a browser refresh with a server restart.
+
+The d6bc frontend passed a second browser-authored graph: both physical-server resources were
+dragged into the load-balancer member area, giving two members. Entry connects to both branches,
+which feed the balancer and then Exit. Saving `Browser Two Server Balance` persisted five edges.
+API readback and the expanded UI preview confirm a supported Mihomo `load-balance` group with
+`round-robin` and both proxies. This remains metadata/preview testing, not live client traffic.
+
+Changing the name, clicking New, then cancelling the discard modal preserved the name and graph.
+A separate API editor saved version 2; saving the browser's version-1 draft displayed the conflict
+warning and kept its unsaved name. Inspection found that the conflict's Reload Latest button
+bypassed the existing discard confirmation. It now uses that same guard; a source-wiring regression
+fails before this one-line change. Rebuilt-image cancellation/confirmation acceptance is pending.

@@ -1226,7 +1226,7 @@ export function TopologyPageConnector() {
                                     <Text size="sm">{t('topology.conflict.message')}</Text>
                                     <Button
                                         leftSection={<TbRefresh size={16} />}
-                                        onClick={handleReloadLatest}
+                                        onClick={() => confirmDiscardChanges(handleReloadLatest)}
                                         size="xs"
                                         variant="light"
                                         w="fit-content"
