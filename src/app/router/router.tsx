@@ -30,6 +30,7 @@ import { TorrentBlockerReportsPageConnector } from '@pages/dashboard/torrent-blo
 import { UsersPageConnector } from '@pages/dashboard/users/ui/connectors'
 import { NotFoundPageComponent } from '@pages/errors/4xx-error'
 import { ErrorPageComponent } from '@pages/errors/5xx-error'
+import { useEffect } from 'react'
 import {
     createBrowserRouter,
     createRoutesFromElements,
@@ -40,6 +41,7 @@ import {
 
 import { ErrorBoundaryHoc } from '@shared/hocs/error-boundary'
 import { AuthGuard } from '@shared/hocs/guards/auth-guard'
+import { setRouteNavigationPending } from '@shared/ui/page/navigation-progress'
 
 import { ROUTES } from '../../shared/constants'
 import { AuthLayout } from '../layouts/auth'
@@ -197,5 +199,16 @@ const router = createBrowserRouter(
 )
 
 export function Router() {
+    useEffect(() => {
+        setRouteNavigationPending(router.state.navigation.state !== 'idle')
+        const unsubscribe = router.subscribe((state) => {
+            setRouteNavigationPending(state.navigation.state !== 'idle')
+        })
+        return () => {
+            unsubscribe()
+            setRouteNavigationPending(false)
+        }
+    }, [])
+
     return <RouterProvider router={router} />
 }

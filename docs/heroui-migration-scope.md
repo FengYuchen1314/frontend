@@ -1,6 +1,6 @@
 # HeroUI 迁移范围与验收清单
 
-盘点基线：Frontend `eb8f1790ec080787091e4c00cdaf05cdaf7b04e4`。本文只记录下一阶段的改造范围，不表示 HeroUI 已经安装、页面已迁移，或该版本已完成浏览器验收。
+盘点基线：Frontend `eb8f1790ec080787091e4c00cdaf05cdaf7b04e4`。本文记录完整改造范围，不是完成报告。后续已安装 HeroUI 并开始第一阶段迁移，最新实现与验证边界见 [G0 代码检查点](heroui-g0-checkpoint.md)；下文保留原始范围，不将部分实现标为整站完成。
 
 范围以 [router](../src/app/router/router.tsx)、[路由常量](../src/shared/constants/routes.ts)、[弹窗注册表](../src/shared/_modals/modal-registry.ts) 和实际调用点为准：**30 个实际页面入口、55 个注册弹窗/抽屉/窗口**，另含 404、错误兜底、动态弹窗和页面内受控弹层。注册项数量不等于所有弹层数量。
 

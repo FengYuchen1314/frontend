@@ -1,28 +1,50 @@
-import { Center, Progress, Stack, Text } from '@mantine/core'
+import { ProgressBar } from '@heroui/react'
+import { useTranslation } from 'react-i18next'
+
+import { LoadingProgress } from './loading-progress'
 
 export function LoadingScreen({
     height = '100dvh',
     text = undefined,
-    value = 100
+    value
 }: {
     height?: string
     text?: string
     value?: number
 }) {
+    const { t } = useTranslation()
+    const progress =
+        typeof value === 'number' && Number.isFinite(value)
+            ? Math.min(100, Math.max(0, value))
+            : undefined
+    const label = text || t('common.message.loading')
+
     return (
-        <Center style={{ height: `calc(${height} - var(--app-shell-header-height) - 20px)` }}>
-            <Stack align="center" gap="xs" w="100%">
-                {text && <Text size="lg">{text}</Text>}
-                <Progress
-                    animated
-                    color="cyan"
-                    maw="32rem"
-                    radius="xs"
-                    striped
-                    value={value}
-                    w="80%"
-                />
-            </Stack>
-        </Center>
+        <div
+            className="flex items-center justify-center"
+            style={{
+                minHeight: `max(0px, calc(${height} - var(--app-shell-header-height, 0px) - 20px))`
+            }}
+        >
+            <LoadingProgress />
+            <div className="flex w-full flex-col items-center gap-3">
+                {text && <p className="text-center text-lg text-foreground">{text}</p>}
+                <ProgressBar
+                    aria-label={label}
+                    className="w-4/5 max-w-lg"
+                    color="accent"
+                    isIndeterminate={progress === undefined}
+                    size="sm"
+                    value={progress}
+                >
+                    {progress !== undefined && (
+                        <ProgressBar.Output className="text-xs text-muted" />
+                    )}
+                    <ProgressBar.Track>
+                        <ProgressBar.Fill />
+                    </ProgressBar.Track>
+                </ProgressBar>
+            </div>
+        </div>
     )
 }

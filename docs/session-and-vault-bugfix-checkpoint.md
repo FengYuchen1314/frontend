@@ -34,4 +34,4 @@
 - Vault DB 改为等事务 `complete` 才报告成功；reset 跨六个 store 原子清空但保留 schema，避免不可取消的延迟删库。恢复在一个事务中替换全部加密记录，失败回滚并保留旧设备 key；blocked 升级明确失败并取消迟到升级。原加密算法、参数及备份格式不变。
 - 默认回归共 166 项通过：基础/表单/列表 64 项，加上会话、认证、Vault、Passkey 102 项。新增认证 19 项、入站草稿 11 项、Vault 持久化 10 项。全仓 TypeScript 和 lint 已通过。
 
-Vault 持久化使用固定 fake-indexeddb 6.2.5；认证和草稿测试执行真实 hook、生产事件逻辑或 SSR，不冒充浏览器端到端测试。新增补充修复的 Actions、新镜像和真实浏览器验证仍待执行。
+Vault 持久化使用固定 fake-indexeddb 6.2.5；认证和草稿测试执行真实 hook、生产事件逻辑或 SSR，不冒充浏览器端到端测试。补充修复已提交为 `3d369d5bea04768a165b176e9999702eec82fd6c`，其 [Actions](https://github.com/FengYuchen1314/frontend/actions/runs/33978702245) 已成功通过 166 项测试、类型检查、全仓 lint 和编译；新镜像部署及真实浏览器验证尚未完成。后续 HeroUI 改动另见 [G0 代码检查点](heroui-g0-checkpoint.md)。

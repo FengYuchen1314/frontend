@@ -1,3 +1,4 @@
+import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 // import { splashScreen } from 'vite-plugin-splash-screen'
@@ -10,6 +11,7 @@ import 'dotenv/config'
 export default defineConfig({
     assetsInclude: ['**/*.lottie'],
     plugins: [
+        tailwindcss(),
         react(),
         removeConsole(),
         webfontDownload()

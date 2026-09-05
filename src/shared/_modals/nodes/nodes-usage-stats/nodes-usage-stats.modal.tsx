@@ -1,7 +1,6 @@
 import NiceModal, { useModal } from '@ebay/nice-modal-react'
 import { ActionIcon, Group, NativeSelect, Stack } from '@mantine/core'
 import { DatePickerInput, DatesRangeValue } from '@mantine/dates'
-import { nprogress } from '@mantine/nprogress'
 import dayjs from 'dayjs'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -15,6 +14,7 @@ import { useGetStatsNodesUsersUsage, useResolveUser } from '@shared/api/hooks'
 import { CompoundDrawerShared } from '@shared/ui/compound-drawer/compound-drawer.shared'
 import { ITopLeaderboardItem, TopLeaderboardCardShared } from '@shared/ui/leaderboard-item-card'
 import { BaseOverlayHeader } from '@shared/ui/overlays/base-overlay-header'
+import { beginNavigationProgress } from '@shared/ui/page/navigation-progress'
 import { getDefaultDateRange } from '@shared/utils/time-utils'
 
 interface IProps {
@@ -68,7 +68,7 @@ export const NodesUsageStatsModal = NiceModal.create((props: IProps) => {
     })
 
     const handleViewUser = async (user: ITopLeaderboardItem) => {
-        nprogress.start()
+        const finishProgress = beginNavigationProgress()
         try {
             const result = await resolveUser({
                 variables: {
@@ -82,7 +82,7 @@ export const NodesUsageStatsModal = NiceModal.create((props: IProps) => {
                 })
             }
         } finally {
-            nprogress.complete()
+            finishProgress()
         }
     }
 

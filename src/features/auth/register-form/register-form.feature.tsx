@@ -1,153 +1,111 @@
-import {
-    Button,
-    Container,
-    Paper,
-    PasswordInput,
-    Stack,
-    Text,
-    TextInput,
-    Title
-} from '@mantine/core'
-import { useForm, schemaResolver } from '@mantine/form'
-import { useClipboard } from '@mantine/hooks'
-import { notifications } from '@mantine/notifications'
-import { RegisterCommand } from '@remnawave/backend-contract'
-import { useEffect } from 'react'
+import { Button, FieldError, Form, Input, Label, Spinner, TextField } from '@heroui/react'
+import { Controller } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { PiShuffleDuotone, PiSignpostDuotone } from 'react-icons/pi'
 
-import { useRegister } from '@shared/api/hooks'
-import { handleFormErrors } from '@shared/utils/misc'
+import { AuthPasswordField } from '../login-form/ui/auth-password-field'
+import { useRegistrationForm } from './model/use-registration-form'
 
 export const RegisterFormFeature = () => {
     const { t } = useTranslation()
-
-    const { copy, copied, error } = useClipboard()
-
-    const form = useForm({
-        validate: {
-            ...schemaResolver(RegisterCommand.RequestBodySchema),
-            confirmPassword: (value, values) =>
-                value !== values.password
-                    ? t('register-form.feature.passwords-do-not-match')
-                    : null,
-            password: (value) =>
-                value.length < 12 ? t('register-form.feature.password-too-short') : null
-        },
-        initialValues: {
-            username: '',
-            password: '',
-            confirmPassword: ''
-        }
-    })
-
-    const { mutate: register, isPending: isLoading } = useRegister({
-        mutationFns: {
-            onError: (error) => {
-                handleFormErrors(form, error)
-            }
-        }
-    })
-
-    const handleGeneratePassword = () => {
-        const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-        const bytes = crypto.getRandomValues(new Uint8Array(32))
-        const newPassword = Array.from(bytes, (b) => charset[b % charset.length]).join('')
-
-        form.setValues({
-            ...form.values,
-            password: newPassword,
-            confirmPassword: newPassword
-        })
-
-        copy(newPassword)
-    }
-
-    useEffect(() => {
-        if (error) {
-            notifications.show({
-                title: t('common.message.error'),
-                message: t('register-form.feature.password-copied-error')
-            })
-        }
-
-        if (copied) {
-            notifications.show({
-                title: t('register-form.feature.password-copied'),
-                message: t('register-form.feature.password-copied-message')
-            })
-        }
-    }, [error, copied])
-
-    const handleSubmit = form.onSubmit((variables) => {
-        register({
-            variables: {
-                username: variables.username,
-                password: variables.password
-            }
-        })
-    })
-
+    const { form, isPending, submit, generatePassword } = useRegistrationForm()
     return (
-        <form onSubmit={handleSubmit}>
-            <Container size="100%">
-                <Paper p={30}>
-                    <Title mb="xs" order={2} ta="center">
-                        {t('register-form.feature.registration')}
-                    </Title>
-                    <Text c="dimmed" mb="md" size="sm" ta="center">
-                        {t('register-form.feature.register-description')}
-                    </Text>
-
-                    <TextInput
-                        label={t('common.field.username')}
-                        placeholder="IamSuperAdmin"
-                        required
-                        size="md"
-                        {...form.getInputProps('username')}
-                    />
-
-                    <Stack mt="md">
-                        <PasswordInput
-                            label={t('common.field.password')}
-                            placeholder="soy_t5Px5`Gm4j0@Hf&Dd7iU"
-                            required
-                            size="md"
-                            style={{ flex: 1 }}
-                            {...form.getInputProps('password')}
-                        />
-
-                        <PasswordInput
-                            label={t('register-form.feature.confirm-password')}
-                            placeholder="soy_t5Px5`Gm4j0@Hf&Dd7iU"
-                            required
-                            size="md"
-                            {...form.getInputProps('confirmPassword')}
-                        />
-
-                        <Button
-                            fullWidth
-                            leftSection={<PiShuffleDuotone size="16px" />}
-                            onClick={handleGeneratePassword}
-                            size="md"
-                        >
-                            {t('register-form.feature.generate')}
-                        </Button>
-                    </Stack>
-
-                    <Button
-                        fullWidth
-                        leftSection={<PiSignpostDuotone size="16px" />}
-                        loading={isLoading}
-                        mt="xl"
-                        size="md"
-                        type="submit"
-                        variant="default"
+        <Form
+            onSubmit={submit}
+            validationBehavior="aria"
+            aria-label={t('register-form.feature.registration')}
+            className="flex w-full flex-col gap-5"
+        >
+            <div className="text-center">
+                <h2 className="text-xl font-semibold">{t('register-form.feature.registration')}</h2>
+                <p className="mt-2 text-sm text-muted">
+                    {t('register-form.feature.register-description')}
+                </p>
+            </div>
+            <Controller
+                control={form.control}
+                name="username"
+                render={({ field, fieldState }) => (
+                    <TextField
+                        name={field.name}
+                        value={field.value}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        isRequired
+                        isInvalid={fieldState.invalid}
+                        isDisabled={isPending}
+                        className="w-full"
                     >
-                        {t('register-form.feature.sign-up')}
-                    </Button>
-                </Paper>
-            </Container>
-        </form>
+                        <Label>{t('common.field.username')}</Label>
+                        <Input
+                            ref={field.ref}
+                            autoComplete="username"
+                            placeholder="IamSuperAdmin"
+                            variant="secondary"
+                        />
+                        <FieldError>{fieldState.error?.message}</FieldError>
+                    </TextField>
+                )}
+            />
+            <Controller
+                control={form.control}
+                name="password"
+                render={({ field, fieldState }) => (
+                    <AuthPasswordField
+                        name={field.name}
+                        label={t('common.field.password')}
+                        value={field.value}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        inputRef={field.ref}
+                        autoComplete="new-password"
+                        error={fieldState.error?.message}
+                        isDisabled={isPending}
+                    />
+                )}
+            />
+            <Controller
+                control={form.control}
+                name="confirmPassword"
+                render={({ field, fieldState }) => (
+                    <AuthPasswordField
+                        name={field.name}
+                        label={t('register-form.feature.confirm-password')}
+                        value={field.value}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        inputRef={field.ref}
+                        autoComplete="new-password"
+                        error={fieldState.error?.message}
+                        isDisabled={isPending}
+                    />
+                )}
+            />
+            <Button
+                type="button"
+                variant="secondary"
+                isDisabled={isPending}
+                onPress={() => {
+                    void generatePassword()
+                }}
+                className="w-full"
+            >
+                <PiShuffleDuotone aria-hidden="true" size={18} />
+                {t('register-form.feature.generate')}
+            </Button>
+            {form.formState.errors.root?.server?.message && (
+                <p role="alert" className="text-sm text-danger">
+                    {form.formState.errors.root.server.message}
+                </p>
+            )}
+            <Button type="submit" variant="primary" isPending={isPending} className="w-full">
+                {isPending ? (
+                    <Spinner size="sm" color="current" />
+                ) : (
+                    <PiSignpostDuotone aria-hidden="true" size={18} />
+                )}
+                {t('register-form.feature.sign-up')}
+            </Button>
+        </Form>
     )
 }

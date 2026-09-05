@@ -1,11 +1,9 @@
-import { nprogress } from '@mantine/nprogress'
 import { useEffect } from 'react'
 
-export function LoadingProgress() {
-    useEffect(() => {
-        nprogress.start()
-        return () => nprogress.complete()
-    }, [])
+import { beginNavigationProgress } from '../page/navigation-progress'
 
-    return <></>
+export function LoadingProgress() {
+    useEffect(() => beginNavigationProgress(), [])
+
+    return null
 }

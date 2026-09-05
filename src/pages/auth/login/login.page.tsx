@@ -1,158 +1,126 @@
 import { LoginFormFeature } from '@features/auth/login-form'
+import { getAuthMethods } from '@features/auth/login-form/model/auth-methods'
 import { OAuth2LoginButtonsFeature } from '@features/auth/oauth2-login-button/oauth2-login-button.feature'
 import { PasskeyLoginButtonFeature } from '@features/auth/passkey-login-button'
 import { RegisterFormFeature } from '@features/auth/register-form'
-import { Badge, Box, Center, Divider, Group, Image, Stack, Text, Title } from '@mantine/core'
-import { GetStatusCommand } from '@remnawave/backend-contract'
+import { Alert, Button, Card, Separator, Spinner } from '@heroui/react'
 import { useMemo } from 'react'
 
 import { useGetAuthStatus } from '@shared/api/hooks/auth/auth.query.hooks'
-import { Logo, Page } from '@shared/ui'
-import { parseColoredTextUtil } from '@shared/utils/misc'
-
-const getAuthMethods = (authStatus: GetStatusCommand.Response['response'] | undefined) => {
-    const isPasswordEnabled = authStatus?.authentication?.password?.enabled ?? false
-    const isPasskeyEnabled = authStatus?.authentication?.passkey?.enabled ?? false
-    const isOAuth2Enabled =
-        Object.values(authStatus?.authentication?.oauth2?.providers ?? {}).some(Boolean) ?? false
-
-    return {
-        isOAuth2Enabled,
-        isPasskeyEnabled,
-        isPasswordEnabled,
-        hasAlternativeMethods: isPasskeyEnabled || isOAuth2Enabled,
-        hasPrimaryMethods: isPasswordEnabled
-    }
-}
-
-const BrandLogo = ({ logoUrl }: { logoUrl?: null | string }) => {
-    if (!logoUrl) {
-        return <Logo c="cyan" w="3rem" />
-    }
-
-    return (
-        <Image
-            alt="logo"
-            fit="contain"
-            src={logoUrl}
-            style={{
-                maxWidth: '40px',
-                maxHeight: '40px',
-                width: '40px',
-                height: '40px'
-            }}
-        />
-    )
-}
-
-const BrandTitle = ({ titleParts }: { titleParts: Array<{ color: string; text: string }> }) => {
-    return (
-        <Title ff="Unbounded" order={1} pos="relative">
-            {titleParts.map((part, index) => (
-                <Text
-                    c={part.color || 'white'}
-                    component="span"
-                    fw="inherit"
-                    fz="inherit"
-                    inherit
-                    key={index}
-                    pos="relative"
-                >
-                    {part.text}
-                </Text>
-            ))}
-        </Title>
-    )
-}
-
-const AlternativeAuthMethods = ({
-    authentication,
-    isOAuth2Enabled,
-    isPasskeyEnabled,
-    isPasswordEnabled
-}: {
-    authentication: GetStatusCommand.Response['response']['authentication']
-    isOAuth2Enabled: boolean
-    isPasskeyEnabled: boolean
-    isPasswordEnabled: boolean
-}) => (
-    <Center>
-        <Stack gap="md" maw={isPasswordEnabled ? 300 : 150} w="100%">
-            {isPasskeyEnabled && authentication && (
-                <PasskeyLoginButtonFeature authentication={authentication} />
-            )}
-            {isOAuth2Enabled && authentication && (
-                <OAuth2LoginButtonsFeature authentication={authentication} />
-            )}
-        </Stack>
-    </Center>
-)
+import { Logo } from '@shared/ui/logo'
+import { Page } from '@shared/ui/page'
+import { parseColoredTextUtil } from '@shared/utils/misc/parse-colored-text'
 
 export const LoginPage = () => {
-    const { data: authStatus } = useGetAuthStatus()
-
-    const titleParts = useMemo(() => {
-        if (authStatus?.branding.title) {
-            return parseColoredTextUtil(authStatus.branding.title)
-        }
-
-        return [
-            { text: 'Remna', color: 'cyan' },
-            { text: 'wave', color: 'white' }
-        ]
-    }, [authStatus])
-
-    const isRegister = !authStatus?.isLoginAllowed && authStatus?.isRegisterAllowed
-    const authMethods = getAuthMethods(authStatus)
+    const { data: authStatus, isPending, refetch } = useGetAuthStatus()
+    const methods = getAuthMethods(authStatus)
+    const brandingTitle = authStatus?.branding.title
+    const titleParts = useMemo(
+        () =>
+            brandingTitle
+                ? parseColoredTextUtil(brandingTitle)
+                : [
+                      { text: 'Remna', color: 'var(--accent)' },
+                      { text: 'wave', color: 'var(--foreground)' }
+                  ],
+        [brandingTitle]
+    )
 
     return (
         <Page title="Login">
-            <Stack align="center" gap="xs">
-                <Group align="center" gap={4} justify="center">
-                    <BrandLogo logoUrl={authStatus?.branding.logoUrl} />
-                    <BrandTitle titleParts={titleParts} />
-                </Group>
-
-                {!authStatus && (
-                    <Badge color="cyan" mt={10} size="lg" variant="filled">
-                        Server is not responding. Check logs.
-                    </Badge>
-                )}
-
-                {!isRegister && authStatus && authStatus.authentication && (
-                    <Box maw={800} p={30} w={{ base: 440, sm: 500, md: 500 }}>
-                        <Stack gap="lg">
-                            {authMethods.isPasswordEnabled && <LoginFormFeature />}
-
-                            {authMethods.hasPrimaryMethods && authMethods.hasAlternativeMethods && (
-                                <Center>
-                                    <Divider
-                                        label="OR"
-                                        labelPosition="center"
-                                        maw="400px"
-                                        w="100%"
-                                    />
-                                </Center>
+            <div className="flex w-full flex-col items-center gap-7">
+                <header className="flex max-w-full items-center justify-center gap-2">
+                    {authStatus?.branding.logoUrl ? (
+                        <img
+                            src={authStatus.branding.logoUrl}
+                            alt="logo"
+                            className="h-10 w-10 shrink-0 object-contain"
+                        />
+                    ) : (
+                        <Logo color="var(--accent)" size="3rem" />
+                    )}
+                    <h1
+                        className="break-words text-center text-3xl font-semibold tracking-tight"
+                        style={{ fontFamily: 'Unbounded, sans-serif' }}
+                    >
+                        {titleParts.map((part, index) => (
+                            <span key={index} style={{ color: part.color }}>
+                                {part.text}
+                            </span>
+                        ))}
+                    </h1>
+                </header>
+                {!authStatus &&
+                    (isPending ? (
+                        <div role="status" className="flex items-center gap-3 text-muted">
+                            <Spinner size="sm" />
+                            Loading authentication methods…
+                        </div>
+                    ) : (
+                        <Alert status="danger" className="w-full">
+                            <Alert.Content>
+                                <Alert.Title>Server is not responding</Alert.Title>
+                                <Alert.Description>
+                                    Check the server logs or try again.
+                                </Alert.Description>
+                                <Button
+                                    className="mt-3"
+                                    variant="secondary"
+                                    onPress={() => {
+                                        void refetch()
+                                    }}
+                                >
+                                    Retry
+                                </Button>
+                            </Alert.Content>
+                        </Alert>
+                    ))}
+                {authStatus && (methods.isRegister || authStatus.isLoginAllowed) && (
+                    <Card className="w-full rounded-3xl p-6 shadow-lg sm:p-8">
+                        <Card.Content className="flex flex-col gap-6 p-0">
+                            {methods.isRegister ? (
+                                <RegisterFormFeature />
+                            ) : (
+                                <>
+                                    {methods.isPasswordEnabled && <LoginFormFeature />}
+                                    {methods.hasPrimaryMethods && methods.hasAlternativeMethods && (
+                                        <div className="flex items-center gap-4" aria-hidden="true">
+                                            <Separator className="flex-1" />
+                                            <span className="text-xs font-medium text-muted">
+                                                OR
+                                            </span>
+                                            <Separator className="flex-1" />
+                                        </div>
+                                    )}
+                                    {authStatus.authentication && methods.hasAlternativeMethods && (
+                                        <div className="flex flex-col gap-3">
+                                            {methods.isPasskeyEnabled && (
+                                                <PasskeyLoginButtonFeature
+                                                    authentication={authStatus.authentication}
+                                                />
+                                            )}
+                                            {methods.isOAuth2Enabled && (
+                                                <OAuth2LoginButtonsFeature
+                                                    authentication={authStatus.authentication}
+                                                />
+                                            )}
+                                        </div>
+                                    )}
+                                </>
                             )}
-
-                            {authMethods.hasAlternativeMethods && (
-                                <AlternativeAuthMethods
-                                    authentication={authStatus.authentication}
-                                    isOAuth2Enabled={authMethods.isOAuth2Enabled}
-                                    isPasskeyEnabled={authMethods.isPasskeyEnabled}
-                                    isPasswordEnabled={authMethods.isPasswordEnabled}
-                                />
-                            )}
-                        </Stack>
-                    </Box>
+                        </Card.Content>
+                    </Card>
                 )}
-
-                {isRegister && (
-                    <Box maw={800} w={{ base: 440, sm: 500, md: 500 }}>
-                        <RegisterFormFeature />
-                    </Box>
+                {authStatus && !methods.isRegister && !authStatus.isLoginAllowed && (
+                    <Alert status="warning">
+                        <Alert.Content>
+                            <Alert.Description>
+                                Authentication is currently unavailable.
+                            </Alert.Description>
+                        </Alert.Content>
+                    </Alert>
                 )}
-            </Stack>
+            </div>
         </Page>
     )
 }

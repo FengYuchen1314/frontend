@@ -32,7 +32,7 @@ const { create, resetAllStores } = await import('../store-wrapper/store-wrapper.
 const { ROUTES } = await import('../../constants/routes.ts')
 const { useLogin, useRegister, useOauth2Callback } =
     await import('../../api/hooks/auth/auth.hooks.ts')
-const { notifications } = await import('@mantine/notifications')
+const { toast } = await import('@heroui/react')
 const originalAdapter = instance.defaults.adapter
 const initialPersistedToken = useSessionStore.getState().token
 const privateStore = create<{ record: string }>()(() => ({ record: '' }))
@@ -341,7 +341,8 @@ const successfulLogins = [
 
 for (const login of successfulLogins) {
     test(`${login.name} real mutation authenticates through the token store without a UI setter`, async (context) => {
-        context.mock.method(notifications, 'show', () => 'fixture-notification')
+        context.mock.method(toast, 'success', () => 'fixture-notification')
+        context.mock.method(toast, 'danger', () => 'fixture-notification')
         const auth = provider()
         auth.render()
         auth.commit()
@@ -358,7 +359,8 @@ for (const login of successfulLogins) {
         assert.equal('setIsAuthenticated' in auth.render(), false)
     })
     test(`${login.name} failure leaves the provider anonymous`, async (context) => {
-        context.mock.method(notifications, 'show', () => 'fixture-notification')
+        context.mock.method(toast, 'success', () => 'fixture-notification')
+        context.mock.method(toast, 'danger', () => 'fixture-notification')
         const auth = provider()
         auth.render()
         auth.commit()
@@ -373,7 +375,10 @@ for (const login of successfulLogins) {
 
 function oauthCallbacks(navigations: string[]) {
     const source = readFileSync(
-        new URL('../../../pages/auth/oauth2-callback/oauth2-callback.page.tsx', import.meta.url),
+        new URL(
+            '../../../features/auth/oauth2-login-button/model/use-oauth2-callback.ts',
+            import.meta.url
+        ),
         'utf8'
     )
     const file = ts.createSourceFile(
@@ -393,7 +398,7 @@ function oauthCallbacks(navigations: string[]) {
     assert(options)
     const scope = {
         logoutEvents,
-        notifications: { show: () => {} },
+        toast: { danger: () => {} },
         navigate: (path: string) => navigations.push(path),
         consumeReturnTo: () => ROUTES.DASHBOARD.MANAGEMENT.USERS,
         ROUTES

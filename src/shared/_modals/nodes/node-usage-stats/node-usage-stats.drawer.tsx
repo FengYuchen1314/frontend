@@ -1,7 +1,6 @@
 import NiceModal, { useModal } from '@ebay/nice-modal-react'
 import { ActionIcon, Group, NativeSelect, Stack } from '@mantine/core'
 import { DatePickerInput, DatesRangeValue } from '@mantine/dates'
-import { nprogress } from '@mantine/nprogress'
 import dayjs from 'dayjs'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -13,6 +12,7 @@ import { useGetStatsNodeUsersUsage, useResolveUser } from '@shared/api/hooks'
 import { CompoundDrawerShared } from '@shared/ui/compound-drawer/compound-drawer.shared'
 import { ITopLeaderboardItem, TopLeaderboardCardShared } from '@shared/ui/leaderboard-item-card'
 import { BaseOverlayHeader } from '@shared/ui/overlays/base-overlay-header'
+import { beginNavigationProgress } from '@shared/ui/page/navigation-progress'
 import { getDefaultDateRange } from '@shared/utils/time-utils'
 
 import { NodeUsersSparklineCardWidget } from './usage-sparkline-card'
@@ -98,14 +98,14 @@ export const NodeUsageStatsDrawer = NiceModal.create((props: IProps) => {
     const { mutateAsync: resolveUser } = useResolveUser()
 
     const handleViewUser = async (user: ITopLeaderboardItem) => {
-        nprogress.start()
+        const finishProgress = beginNavigationProgress()
         try {
             const result = await resolveUser({ variables: { username: user.name } })
             if (result.id) {
                 showModal('users_viewUserModal', { userId: result.id })
             }
         } finally {
-            nprogress.complete()
+            finishProgress()
         }
     }
 

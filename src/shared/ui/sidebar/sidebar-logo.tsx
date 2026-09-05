@@ -38,11 +38,11 @@ export const SidebarLogoShared = () => {
 
     return (
         <Logo
-            c="cyan"
+            color="var(--accent)"
             className={classes.fadeIn}
             onClick={handleClick}
             style={{ cursor: 'pointer' }}
-            w="2.5rem"
+            size="2.5rem"
         />
     )
 }

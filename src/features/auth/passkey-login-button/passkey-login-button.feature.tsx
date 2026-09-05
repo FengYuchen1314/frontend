@@ -1,5 +1,4 @@
-import { Button } from '@mantine/core'
-import { notifications } from '@mantine/notifications'
+import { Button, Spinner, toast } from '@heroui/react'
 import { GetStatusCommand } from '@remnawave/backend-contract'
 import {
     type PublicKeyCredentialRequestOptionsJSON,
@@ -71,10 +70,8 @@ export const PasskeyLoginButtonFeature = (props: IProps) => {
                 onSuccess: (data) => {
                     setIsLoading(false)
                     setToken({ token: data.accessToken })
-                    notifications.show({
-                        title: 'Passkey Verified',
-                        message: 'Passkey authenticated successfully',
-                        color: 'teal'
+                    toast.success('Passkey Verified', {
+                        description: 'Passkey authenticated successfully'
                     })
                 },
                 onSettled: () => setIsLoading(false)
@@ -83,16 +80,12 @@ export const PasskeyLoginButtonFeature = (props: IProps) => {
             if (isCancel(error)) return
             if (error instanceof Error) {
                 if (error.name === 'NotAllowedError') {
-                    notifications.show({
-                        title: 'Passkey Authentication',
-                        message: 'Authentication was cancelled',
-                        color: 'yellow'
+                    toast.warning('Passkey Authentication', {
+                        description: 'Authentication was cancelled'
                     })
                 } else if (error.name === 'NotSupportedError') {
-                    notifications.show({
-                        title: 'Passkey Authentication',
-                        message: 'Passkeys are not supported on this device',
-                        color: 'red'
+                    toast.danger('Passkey Authentication', {
+                        description: 'Passkeys are not supported on this device'
                     })
                 }
             }
@@ -103,13 +96,18 @@ export const PasskeyLoginButtonFeature = (props: IProps) => {
 
     return (
         <Button
-            color="dark"
-            leftSection={<TbFingerprint color="white" size={20} />}
-            loaderProps={{ type: 'dots' }}
-            loading={isLoading}
-            onClick={handlePasskeyLogin}
-            variant="filled"
+            isPending={isLoading}
+            onPress={() => {
+                void handlePasskeyLogin()
+            }}
+            variant="secondary"
+            className="w-full"
         >
+            {isLoading ? (
+                <Spinner size="sm" color="current" />
+            ) : (
+                <TbFingerprint aria-hidden="true" size={20} />
+            )}
             Passkey
         </Button>
     )

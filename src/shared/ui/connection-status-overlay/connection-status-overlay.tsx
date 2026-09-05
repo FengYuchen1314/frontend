@@ -1,4 +1,5 @@
-import { Box, Group, Loader, Paper, Stack, Text, ThemeIcon, Transition } from '@mantine/core'
+import { Alert, Spinner } from '@heroui/react'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useTranslation } from 'react-i18next'
 import { PiWifiSlash } from 'react-icons/pi'
 
@@ -8,64 +9,34 @@ export function ConnectionStatusOverlay() {
     const { t } = useTranslation()
 
     const { isOnline } = useConnectionProbe()
+    const reduceMotion = useReducedMotion()
 
     return (
-        <Transition
-            duration={150}
-            mounted={!isOnline}
-            timingFunction="ease"
-            transition="slide-down"
-        >
-            {(transitionStyles) => (
-                <Box
-                    style={{
-                        display: 'flex',
-                        inset: '16px 0 auto 0',
-                        justifyContent: 'center',
-                        pointerEvents: 'none',
-                        position: 'fixed',
-                        zIndex: 'var(--mantine-z-index-max)'
-                    }}
+        <AnimatePresence>
+            {!isOnline && (
+                <motion.div
+                    animate={{ opacity: 1, y: 0 }}
+                    className="pointer-events-none fixed inset-x-0 top-4 z-[10000] flex justify-center px-4"
+                    exit={{ opacity: 0, y: reduceMotion ? 0 : -8 }}
+                    initial={{ opacity: 0, y: reduceMotion ? 0 : -8 }}
+                    transition={{ duration: reduceMotion ? 0 : 0.15 }}
                 >
-                    <Paper
-                        p="sm"
-                        radius="md"
-                        shadow="xl"
-                        style={{
-                            ...transitionStyles,
-                            background:
-                                'linear-gradient(135deg, rgba(30, 30, 35, 0.98) 0%, rgba(45, 25, 25, 0.98) 100%)',
-                            border: '1px solid rgba(250, 82, 82, 0.35)',
-                            pointerEvents: 'auto'
-                        }}
-                    >
-                        <Group gap="sm" wrap="nowrap">
-                            <ThemeIcon
-                                color="red"
-                                size="lg"
-                                style={{
-                                    background: 'rgba(250, 82, 82, 0.1)',
-                                    border: '1px solid rgba(250, 82, 82, 0.3)'
-                                }}
-                                variant="light"
-                            >
-                                <PiWifiSlash size="20px" />
-                            </ThemeIcon>
-                            <Stack gap={2}>
-                                <Text fw={600} size="sm">
-                                    {t('connection-status-overlay.connection-lost')}
-                                </Text>
-                                <Group gap={6}>
-                                    <Loader color="red" size={12} />
-                                    <Text c="dimmed" size="xs">
-                                        {t('connection-status-overlay.reconnecting')}
-                                    </Text>
-                                </Group>
-                            </Stack>
-                        </Group>
-                    </Paper>
-                </Box>
+                    <Alert className="w-fit max-w-full shadow-xl" role="status" status="danger">
+                        <Alert.Indicator>
+                            <PiWifiSlash aria-hidden size={20} />
+                        </Alert.Indicator>
+                        <Alert.Content>
+                            <Alert.Title>
+                                {t('connection-status-overlay.connection-lost')}
+                            </Alert.Title>
+                            <Alert.Description className="flex items-center gap-2">
+                                <Spinner aria-hidden color="danger" size="sm" />
+                                {t('connection-status-overlay.reconnecting')}
+                            </Alert.Description>
+                        </Alert.Content>
+                    </Alert>
+                </motion.div>
             )}
-        </Transition>
+        </AnimatePresence>
     )
 }

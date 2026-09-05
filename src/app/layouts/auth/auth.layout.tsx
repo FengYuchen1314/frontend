@@ -1,12 +1,11 @@
-import { Box, Center } from '@mantine/core'
 import { Outlet } from 'react-router'
 
 export function AuthLayout() {
     return (
-        <Center mih="100vh" p="md">
-            <Box maw="25rem">
+        <main className="flex min-h-dvh w-full items-center justify-center bg-background px-4 py-10 text-foreground sm:px-6">
+            <div className="w-full max-w-md">
                 <Outlet />
-            </Box>
-        </Center>
+            </div>
+        </main>
     )
 }

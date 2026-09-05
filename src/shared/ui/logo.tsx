@@ -1,16 +1,14 @@
 /* eslint-disable @stylistic/indent */
 
-import { Box, BoxProps, ElementProps } from '@mantine/core'
+import { SVGProps } from 'react'
 
-interface LogoProps
-    extends ElementProps<'svg', keyof BoxProps>, Omit<BoxProps, 'children' | 'ref'> {
+interface LogoProps extends Omit<SVGProps<SVGSVGElement>, 'children' | 'ref'> {
     size?: number | string
 }
 
 export function Logo({ size, style, ...props }: LogoProps) {
     return (
-        <Box
-            component="svg"
+        <svg
             fill="none"
             style={{ width: size, height: size, ...style }}
             viewBox="0 0 16 16"
@@ -23,6 +21,6 @@ export function Logo({ size, style, ...props }: LogoProps) {
                 fill="currentColor"
                 fillRule="evenodd"
             />
-        </Box>
+        </svg>
     )
 }

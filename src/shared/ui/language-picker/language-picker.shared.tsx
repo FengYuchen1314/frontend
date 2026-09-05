@@ -1,9 +1,8 @@
-import { ActionIcon, Menu, Text, useDirection } from '@mantine/core'
-import { useEffect } from 'react'
+import { Dropdown, Label, toast } from '@heroui/react'
 import { useTranslation } from 'react-i18next'
 import { TbLanguage } from 'react-icons/tb'
 
-const data = [
+const languages = [
     { label: 'English', emoji: '🇬🇧', value: 'en' },
     { label: 'Русский', emoji: '🇷🇺', value: 'ru' },
     { label: 'فارسی', emoji: '🇮🇷', value: 'fa' },
@@ -11,52 +10,44 @@ const data = [
 ]
 
 export function LanguagePicker() {
-    const { toggleDirection, dir } = useDirection()
     const { i18n } = useTranslation()
-
-    useEffect(() => {
-        const savedLanguage = localStorage.getItem('i18nextLng')
-        if (savedLanguage) {
-            i18n.changeLanguage(savedLanguage)
-
-            if (savedLanguage === 'fa') {
-                if (dir === 'ltr') {
-                    toggleDirection()
-                }
-            }
-        }
-    }, [i18n])
-
-    const changeLanguage = (value: string) => {
-        i18n.changeLanguage(value)
-
-        if (value === 'fa' && dir === 'ltr') {
-            toggleDirection()
-        }
-
-        if (dir === 'rtl' && value !== 'fa') {
-            toggleDirection()
-        }
-    }
-
-    const items = data.map((item) => (
-        <Menu.Item
-            key={item.value}
-            leftSection={<Text>{item.emoji}</Text>}
-            onClick={() => changeLanguage(item.value)}
-        >
-            {item.label}
-        </Menu.Item>
-    ))
+    const locale = (i18n.resolvedLanguage || i18n.language || 'en').split('-')[0]
 
     return (
-        <Menu position="bottom-end" width={150} withinPortal>
-            <Menu.Target>
-                <ActionIcon color="gray" size="xl" style={{ borderColor: 'transparent' }}>
-                    <TbLanguage size={22} />
-                </ActionIcon>
-            </Menu.Target>
-            <Menu.Dropdown>{items}</Menu.Dropdown>
-        </Menu>
+        <Dropdown>
+            <Dropdown.Trigger
+                aria-label="Language"
+                className="inline-flex size-10 items-center justify-center rounded-full hover:bg-default"
+            >
+                <TbLanguage aria-hidden size={22} />
+            </Dropdown.Trigger>
+            <Dropdown.Popover placement="bottom end">
+                <Dropdown.Menu
+                    aria-label="Language"
+                    onAction={(key) => {
+                        const language = languages.find((entry) => entry.value === key)
+                        if (language) {
+                            void i18n.changeLanguage(language.value).catch(() => {
+                                toast.danger('Unable to change language')
+                            })
+                        }
+                    }}
+                    selectedKeys={[locale]}
+                    selectionMode="single"
+                >
+                    {languages.map((language) => (
+                        <Dropdown.Item
+                            id={language.value}
+                            key={language.value}
+                            textValue={language.label}
+                        >
+                            <span aria-hidden>{language.emoji}</span>
+                            <Label>{language.label}</Label>
+                            <Dropdown.ItemIndicator />
+                        </Dropdown.Item>
+                    ))}
+                </Dropdown.Menu>
+            </Dropdown.Popover>
+        </Dropdown>
     )
 }

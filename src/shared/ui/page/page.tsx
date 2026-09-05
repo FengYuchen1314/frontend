@@ -1,13 +1,12 @@
-import { Box, BoxProps } from '@mantine/core'
-import { nprogress } from '@mantine/nprogress'
-import { AnimatePresence, motion } from 'framer-motion'
-import { forwardRef, ReactNode, useEffect, useMemo } from 'react'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
+import { forwardRef, type ComponentPropsWithoutRef, type ReactNode } from 'react'
 import { app } from 'src/config'
 
 import { useGetAuthStatus } from '@shared/api/hooks/auth/auth.query.hooks'
-import { parseColoredTextUtil } from '@shared/utils/misc'
 
-interface PageProps extends BoxProps {
+import { formatPageTitle } from './page-title'
+
+interface PageProps extends Omit<ComponentPropsWithoutRef<'div'>, 'title'> {
     children: ReactNode
     meta?: ReactNode
     title: string
@@ -16,23 +15,8 @@ interface PageProps extends BoxProps {
 export const Page = forwardRef<HTMLDivElement, PageProps>(
     ({ children, title = '', meta, ...other }, ref) => {
         const { data: authStatus } = useGetAuthStatus()
-
-        useEffect(() => {
-            nprogress.complete()
-            return () => nprogress.start()
-        }, [])
-
-        const titleParts = useMemo(() => {
-            if (authStatus?.branding.title) {
-                return parseColoredTextUtil(authStatus.branding.title)
-                    .map((part) => part.text)
-                    .join('')
-            }
-
-            return app.name
-        }, [authStatus])
-
-        const pageTitle = `${title} | ${titleParts}`
+        const reduceMotion = useReducedMotion()
+        const pageTitle = formatPageTitle(title, authStatus?.branding.title, app.name)
 
         return (
             <>
@@ -43,15 +27,15 @@ export const Page = forwardRef<HTMLDivElement, PageProps>(
                     <motion.div
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        initial={{ opacity: 0 }}
+                        initial={reduceMotion ? false : { opacity: 0 }}
                         transition={{
-                            duration: 0.3,
+                            duration: reduceMotion ? 0 : 0.3,
                             ease: 'easeInOut'
                         }}
                     >
-                        <Box ref={ref} {...other}>
+                        <div ref={ref} {...other}>
                             {children}
-                        </Box>
+                        </div>
                     </motion.div>
                 </AnimatePresence>
             </>

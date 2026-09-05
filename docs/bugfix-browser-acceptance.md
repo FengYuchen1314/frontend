@@ -42,4 +42,4 @@
 
 Vault 新回归使用真实加密和 fake-indexeddb，验证事务提交、失败回滚和 blocked 升级行为，不等同于真实浏览器 IndexedDB、多标签页或实际磁盘失败。Passkey 流程回归不等同于硬件认证器验证。移动端、失败保存重试、完整长列表分页及多账号浏览器竞态仍需继续验证。
 
-HeroUI 尚未迁移；完整范围见 [迁移清单](heroui-migration-scope.md)。
+上述浏览器实测版本未包含 HeroUI。后续迁移代码见 [G0 代码检查点](heroui-g0-checkpoint.md)，尚未部署到此 VPS；完整范围见 [迁移清单](heroui-migration-scope.md)。

@@ -69,7 +69,7 @@ test('a session change during the authenticator prompt must not submit its old a
             verified++
             return { accessToken: 'fixture-token' }
         },
-        notifications: { show: () => {} },
+        toast: { success: () => {}, warning: () => {}, danger: () => {} },
         getSessionGeneration: () => generation,
         assertSessionGeneration: (expected: number) => {
             assert.equal(expected, generation)
@@ -97,7 +97,7 @@ test('failed options refetch must not reuse cached options or open the authentic
             return { id: 'fixture' }
         },
         verifyAuthentication: async () => ({ accessToken: 'fixture-token' }),
-        notifications: { show: () => {} },
+        toast: { success: () => {}, warning: () => {}, danger: () => {} },
         getSessionGeneration: () => 0,
         assertSessionGeneration: () => {}
     })
@@ -117,7 +117,7 @@ test('a current successful production click commits its verified token exactly o
             generation++
             events.push(token)
         },
-        notifications: { show: () => events.push('success-notice') },
+        toast: { success: () => events.push('success-notice') },
         getSessionGeneration: () => generation
     })
     await click()
@@ -207,7 +207,10 @@ test('ordinary current authenticator cancellation keeps the existing user notifi
         verifyAuthentication: async () => {
             throw new Error('must not verify')
         },
-        notifications: { show: ({ message }: { message: string }) => events.push(message) },
+        toast: {
+            warning: (_title: string, { description }: { description: string }) =>
+                events.push(description)
+        },
         getSessionGeneration: () => 0
     })
     await click()
@@ -275,6 +278,6 @@ test('the production effect clears mounted loading on session changes without ab
     cleanup()
     assert.equal(listener, undefined)
     assert.deepEqual(events, ['invalidated', 'loading:false', 'unsubscribed', 'invalidated'])
-    assert.match(source, /loading=\{isLoading\}/)
+    assert.match(source, /isPending=\{isLoading\}/)
     assert.doesNotMatch(source, /isLoading\s*\|\|\s*isPending/)
 })

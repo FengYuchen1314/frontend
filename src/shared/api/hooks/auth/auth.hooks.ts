@@ -1,4 +1,4 @@
-import { notifications } from '@mantine/notifications'
+import { toast } from '@heroui/react'
 import {
     LoginCommand,
     OAuth2AuthorizeCommand,
@@ -23,11 +23,7 @@ export const useLogin = createMutationHook({
             setToken({ token: data.accessToken })
         },
         onError: (error) => {
-            notifications.show({
-                title: 'Login',
-                message: error.message,
-                color: 'red'
-            })
+            toast.danger('Login', { description: error.message })
         }
     }
 })
@@ -39,19 +35,11 @@ export const useRegister = createMutationHook({
     requestMethod: RegisterCommand.endpointDetails.REQUEST_METHOD,
     rMutationParams: {
         onSuccess: (data) => {
-            notifications.show({
-                title: 'Register',
-                message: 'User registered successfully',
-                color: 'teal'
-            })
+            toast.success('Register', { description: 'User registered successfully' })
             setToken({ token: data.accessToken })
         },
         onError: (error) => {
-            notifications.show({
-                title: 'Register',
-                message: error.message,
-                color: 'red'
-            })
+            toast.danger('Register', { description: error.message })
         }
     }
 })
@@ -75,11 +63,7 @@ export const useOAuth2Authorize = createMutationHook({
     requestMethod: OAuth2AuthorizeCommand.endpointDetails.REQUEST_METHOD,
     rMutationParams: {
         onError: (error) => {
-            notifications.show({
-                title: 'OAuth2 Authorize',
-                message: error.message,
-                color: 'red'
-            })
+            toast.danger('OAuth2 Authorize', { description: error.message })
         }
     }
 })
