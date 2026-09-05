@@ -7,7 +7,7 @@ import {
     SERVER_TYPES,
     TNodeCreationMode
 } from '@remnawave/backend-contract'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { TbCpu, TbFileImport } from 'react-icons/tb'
 
@@ -45,7 +45,9 @@ export const CreateNodeModal = NiceModal.create((props: IProps) => {
         name: 'create-node-form',
         mode: 'uncontrolled',
         initialValues: {
-            creationMode
+            creationMode,
+            port: 2222,
+            serverType: SERVER_TYPES.PUBLIC_DIRECT
         } as CreateNodeCommand.RequestBody,
         validate: schemaResolver(CreateNodeCommand.RequestBodySchema)
     })
@@ -76,15 +78,6 @@ export const CreateNodeModal = NiceModal.create((props: IProps) => {
 
     const nextStep = () => setActiveStep((current) => (current < 2 ? current + 1 : current))
     const prevStep = () => setActiveStep((current) => (current > 0 ? current - 1 : current))
-
-    useEffect(() => {
-        const values = form.getValues()
-
-        form.setValues({
-            port: values.port ?? 2222,
-            serverType: values.serverType ?? SERVER_TYPES.PUBLIC_DIRECT
-        })
-    }, [form])
 
     form.watch('port', ({ value }) => {
         if (value) {
