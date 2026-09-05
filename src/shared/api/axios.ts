@@ -6,8 +6,8 @@ import axios from 'axios'
 import consola from 'consola/browser'
 
 import { logoutEvents } from '../emitters/emit-logout'
-
-let authorizationToken = ''
+import { clearQueryClient } from './query-client'
+import { createSessionRequestBoundary } from './session-request-boundary'
 
 let BASE_DOMAIN = __DOMAIN_BACKEND__
 const isDev = __NODE_ENV__ === 'development'
@@ -34,38 +34,20 @@ export const instance = axios.create({
     }
 })
 
-instance.interceptors.request.use((config) => {
-    config.headers.set('Authorization', `Bearer ${authorizationToken}`)
-    return config
-})
-
-export const setAuthorizationToken = (token: string) => {
-    authorizationToken = token
-}
-
-export const hasAuthorizationToken = () => authorizationToken !== ''
-export const getAuthorizationToken = () => authorizationToken
-
-instance.interceptors.response.use(
-    (response) => {
-        return response
-    },
-    (error) => {
-        if (error.response) {
-            const responseStatus = error.response.status
-            if (responseStatus === 403 || responseStatus === 401) {
-                try {
-                    logoutEvents.emit()
-                } catch (error) {
-                    consola.log('error', error)
-                }
-
-                // notifications.show({
-                //     title: 'Unauthorized',
-                //     message: 'You are not authorized to access this resource.'
-                // })
-            }
+const authorizationSession = createSessionRequestBoundary(
+    instance,
+    () => {
+        try {
+            logoutEvents.emit()
+        } catch (error) {
+            consola.log('error', error)
         }
-        return Promise.reject(error)
-    }
+    },
+    clearQueryClient
 )
+
+export const setAuthorizationToken = authorizationSession.setToken
+export const getAuthorizationToken = authorizationSession.getToken
+export const hasAuthorizationToken = () => getAuthorizationToken() !== ''
+export const getSessionGeneration = authorizationSession.getGeneration
+export const assertSessionGeneration = authorizationSession.assertGeneration

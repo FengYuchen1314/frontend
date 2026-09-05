@@ -11,8 +11,6 @@ import {
     TextInput,
     ThemeIcon
 } from '@mantine/core'
-import { useDebouncedValue } from '@mantine/hooks'
-import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { PiPlus, PiTrash } from 'react-icons/pi'
 
@@ -31,8 +29,6 @@ export const RemarksManager = ({
     onChange: (remarks: string[]) => void
     title: string
 }) => {
-    const [localRemarks, setLocalRemarks] = useState<string[]>(initialRemarks)
-    const [debouncedRemarks] = useDebouncedValue(localRemarks, 300)
     const { t } = useTranslation()
 
     const [parent] = useAutoAnimate((el, action) => {
@@ -59,33 +55,19 @@ export const RemarksManager = ({
         })
     })
 
-    useEffect(() => {
-        setLocalRemarks(initialRemarks)
-    }, [initialRemarks])
-
-    useEffect(() => {
-        onChange(debouncedRemarks)
-    }, [debouncedRemarks])
-
     const addLocalRemark = () => {
-        setLocalRemarks((prev) => [...prev, ''])
+        onChange([...initialRemarks, ''])
     }
 
     const removeLocalRemark = (index: number) => {
-        setLocalRemarks((prev) => {
-            const newRemarks = [...prev]
-            newRemarks.splice(index, 1)
-            if (newRemarks.length === 0) newRemarks.push('')
-            return newRemarks
-        })
+        const newRemarks = initialRemarks.filter((_, remarkIndex) => remarkIndex !== index)
+        onChange(newRemarks.length > 0 ? newRemarks : [''])
     }
 
     const updateLocalRemark = (index: number, value: string) => {
-        setLocalRemarks((prev) => {
-            const newRemarks = [...prev]
-            newRemarks[index] = value
-            return newRemarks
-        })
+        onChange(
+            initialRemarks.map((remark, remarkIndex) => (remarkIndex === index ? value : remark))
+        )
     }
 
     return (
@@ -114,7 +96,7 @@ export const RemarksManager = ({
                 <Divider />
 
                 <Stack gap="xs" ref={parent}>
-                    {localRemarks.map((remark, index) => (
+                    {initialRemarks.map((remark, index) => (
                         <Group align="flex-start" gap="sm" key={index}>
                             <TextInput
                                 leftSection={<TemplateInfoPopoverShared />}
@@ -125,7 +107,7 @@ export const RemarksManager = ({
                             />
                             <ActionIcon
                                 color="red"
-                                disabled={localRemarks.length === 1}
+                                disabled={initialRemarks.length === 1}
                                 onClick={() => removeLocalRemark(index)}
                                 size="lg"
                                 variant="light"

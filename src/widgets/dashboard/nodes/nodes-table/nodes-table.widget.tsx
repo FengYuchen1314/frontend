@@ -60,8 +60,6 @@ export const NodesTableWidget = memo((props: IProps) => {
     const prevStateRef = useRef(state)
     const isDraggingRef = useRef(false)
     const dragSnapshotRef = useRef<typeof state | null>(null)
-    const activeTagRef = useRef(activeTag)
-    activeTagRef.current = activeTag
     const isMobile = useIsMobile()
 
     useGetNodes({
@@ -100,7 +98,7 @@ export const NodesTableWidget = memo((props: IProps) => {
                 return
             }
 
-            if (activeTagRef.current !== null) {
+            if (activeTag !== null) {
                 prevStateRef.current = state
                 return
             }
@@ -120,7 +118,7 @@ export const NodesTableWidget = memo((props: IProps) => {
 
             prevStateRef.current = state
         })()
-    }, [state])
+    }, [state, activeTag, reorderNodes])
 
     useEffect(() => {
         handlers.setState(visibleNodes)

@@ -12,7 +12,7 @@ import {
     TextInput
 } from '@mantine/core'
 import { GetExternalSquadByUuidCommand } from '@remnawave/backend-contract'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { PiInfo, PiPlus, PiTrash } from 'react-icons/pi'
 import { TbDeviceFloppy, TbPrescription } from 'react-icons/tb'
@@ -39,11 +39,24 @@ const HEADER_NAME_REGEX = /^[!#$%&'*+\-.0-9A-Z^_`a-z|~]+$/
 const HEADER_VALUE_REGEX = /^$|^[\x21-\x7E]([\x20-\x7E]*[\x21-\x7E])?$/
 
 export const ExternalSquadsResponseHeadersTabWidget = (props: IProps) => {
+    return <ExternalSquadsResponseHeadersForm key={props.externalSquad.uuid} {...props} />
+}
+
+const ExternalSquadsResponseHeadersForm = (props: IProps) => {
     const { externalSquad } = props
     const { t } = useTranslation()
 
-    const [addHeaders, setAddHeaders] = useState<HeaderItem[]>([])
-    const [removeKeys, setRemoveKeys] = useState<string[]>([])
+    const [addHeaders, setAddHeaders] = useState<HeaderItem[]>(() =>
+        sortResponseHeadersByPriority(
+            Object.entries(externalSquad.responseHeadersAdd ?? {}).map(([key, value]) => ({
+                key,
+                value: String(value)
+            }))
+        )
+    )
+    const [removeKeys, setRemoveKeys] = useState<string[]>(
+        externalSquad.responseHeadersRemove ?? []
+    )
 
     const { data: subscriptionSettings } = useGetSubscriptionSettings()
     const inheritedHeaderKeys = Object.keys(subscriptionSettings?.customResponseHeaders ?? {})
@@ -54,18 +67,6 @@ export const ExternalSquadsResponseHeadersTabWidget = (props: IProps) => {
         easing: 'ease-in-out',
         disrespectUserMotionPreference: false
     })
-
-    useEffect(() => {
-        setAddHeaders(
-            sortResponseHeadersByPriority(
-                Object.entries(externalSquad.responseHeadersAdd ?? {}).map(([key, value]) => ({
-                    key,
-                    value: String(value)
-                }))
-            )
-        )
-        setRemoveKeys(externalSquad.responseHeadersRemove ?? [])
-    }, [externalSquad])
 
     const { mutate: updateExternalSquad, isPending: isUpdatingExternalSquad } =
         useUpdateExternalSquad({

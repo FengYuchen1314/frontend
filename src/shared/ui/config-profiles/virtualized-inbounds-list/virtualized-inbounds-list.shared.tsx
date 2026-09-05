@@ -1,8 +1,8 @@
 import type { IProps } from './interfaces/props.interface'
 
-import { Box, Checkbox } from '@mantine/core'
-import { useVirtualizer } from '@tanstack/react-virtual'
-import { memo, useRef } from 'react'
+import { Checkbox } from '@mantine/core'
+import { memo } from 'react'
+import { Virtuoso } from 'react-virtuoso'
 
 import { InboundCheckboxCardShared } from '../inbound-checkbox-card/inbound-checkbox-card.shared'
 
@@ -11,64 +11,27 @@ const MAX_VISIBLE_INBOUNDS = 6
 
 export const VirtualizedInboundsListShared = memo((props: IProps) => {
     const { profile, selectedInbounds, onInboundToggle } = props
-
-    const parentRef = useRef<HTMLDivElement>(null)
-
-    const virtualizer = useVirtualizer({
-        count: profile.inbounds.length,
-        getScrollElement: () => parentRef.current,
-        estimateSize: () => INBOUND_HEIGHT,
-        overscan: 2
-    })
-
     const containerHeight = Math.min(profile.inbounds.length, MAX_VISIBLE_INBOUNDS) * INBOUND_HEIGHT
 
     return (
-        <Box
-            ref={parentRef}
-            style={{
-                height: `${containerHeight}px`,
-                overflow: 'auto'
-            }}
-        >
-            <Box
-                style={{
-                    height: `${virtualizer.getTotalSize()}px`,
-                    width: '100%',
-                    position: 'relative'
-                }}
-            >
-                <Checkbox.Group>
-                    {virtualizer.getVirtualItems().map((virtualItem) => {
-                        const inbound = profile.inbounds[virtualItem.index]
-                        const isSelected = selectedInbounds.has(inbound.uuid)
-
-                        return (
-                            <div
-                                key={inbound.uuid}
-                                style={{
-                                    position: 'absolute',
-                                    top: 0,
-                                    left: 0,
-                                    width: '100%',
-                                    height: `${virtualItem.size}px`,
-                                    transform: `translateY(${virtualItem.start}px)`,
-                                    paddingBottom: '0px',
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                <InboundCheckboxCardShared
-                                    inbound={inbound}
-                                    isSelected={isSelected}
-                                    key={inbound.uuid}
-                                    onInboundToggle={onInboundToggle}
-                                />
-                            </div>
-                        )
-                    })}
-                </Checkbox.Group>
-            </Box>
-        </Box>
+        <Checkbox.Group>
+            <Virtuoso
+                computeItemKey={(_, inbound) => inbound.uuid}
+                data={profile.inbounds}
+                fixedItemHeight={INBOUND_HEIGHT}
+                increaseViewportBy={INBOUND_HEIGHT * 2}
+                itemContent={(_, inbound) => (
+                    <div style={{ height: INBOUND_HEIGHT, cursor: 'pointer' }}>
+                        <InboundCheckboxCardShared
+                            inbound={inbound}
+                            isSelected={selectedInbounds.has(inbound.uuid)}
+                            onInboundToggle={onInboundToggle}
+                        />
+                    </div>
+                )}
+                style={{ height: containerHeight }}
+            />
+        </Checkbox.Group>
     )
 })
 

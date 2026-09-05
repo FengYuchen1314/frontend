@@ -4,7 +4,7 @@ import { modals } from '@mantine/modals'
 import { notifications } from '@mantine/notifications'
 import { GetExternalSquadByUuidCommand } from '@remnawave/backend-contract'
 import { RemarksManager } from '@widgets/dashboard/subscription-settings/settings/cards/managers/remarks-manager.widget'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { PiClockCountdown, PiClockUser, PiListChecks, PiProhibit } from 'react-icons/pi'
 import { TbDeviceFloppy, TbDevices2, TbListLetters, TbX } from 'react-icons/tb'
@@ -27,24 +27,17 @@ const DEFAULT_REMARKS = {
 }
 
 export const ExternalSquadsCustomRemarksTabWidget = (props: IProps) => {
+    return <ExternalSquadsCustomRemarksForm key={props.externalSquad.uuid} {...props} />
+}
+
+const ExternalSquadsCustomRemarksForm = (props: IProps) => {
     const { externalSquad } = props
     const { t } = useTranslation()
 
-    const [isOverrideEnabled, setIsOverrideEnabled] = useState<boolean>(false)
-    const [remarks, setRemarks] = useState<Record<string, string[]>>({
-        expired: DEFAULT_REMARKS.expired,
-        limited: DEFAULT_REMARKS.limited,
-        disabled: DEFAULT_REMARKS.disabled,
-        emptyHosts: DEFAULT_REMARKS.emptyHosts,
-        HWIDMaxDevicesExceeded: DEFAULT_REMARKS.HWIDMaxDevicesExceeded,
-        HWIDNotSupported: DEFAULT_REMARKS.HWIDNotSupported
-    })
-
-    useEffect(() => {
+    const [isOverrideEnabled, setIsOverrideEnabled] = useState(!!externalSquad.customRemarks)
+    const [remarks, setRemarks] = useState<Record<string, string[]>>(() => {
         const currentRemarks = externalSquad.customRemarks
         if (currentRemarks) {
-            setIsOverrideEnabled(true)
-
             const processRemarks = (remarksData: string | string[] | undefined): string[] => {
                 if (!remarksData) return ['']
                 if (typeof remarksData === 'string') {
@@ -55,26 +48,17 @@ export const ExternalSquadsCustomRemarksTabWidget = (props: IProps) => {
                 return Array.isArray(remarksData) && remarksData.length > 0 ? remarksData : ['']
             }
 
-            setRemarks({
+            return {
                 expired: processRemarks(currentRemarks.expiredUsers),
                 limited: processRemarks(currentRemarks.limitedUsers),
                 disabled: processRemarks(currentRemarks.disabledUsers),
                 emptyHosts: processRemarks(currentRemarks.emptyHosts),
                 HWIDMaxDevicesExceeded: processRemarks(currentRemarks.HWIDMaxDevicesExceeded),
                 HWIDNotSupported: processRemarks(currentRemarks.HWIDNotSupported)
-            })
-        } else {
-            setIsOverrideEnabled(false)
-            setRemarks({
-                expired: DEFAULT_REMARKS.expired,
-                limited: DEFAULT_REMARKS.limited,
-                disabled: DEFAULT_REMARKS.disabled,
-                emptyHosts: DEFAULT_REMARKS.emptyHosts,
-                HWIDMaxDevicesExceeded: DEFAULT_REMARKS.HWIDMaxDevicesExceeded,
-                HWIDNotSupported: DEFAULT_REMARKS.HWIDNotSupported
-            })
+            }
         }
-    }, [externalSquad])
+        return { ...DEFAULT_REMARKS }
+    })
 
     const updateExpiredRemarks = useCallback((newRemarks: string[]) => {
         setRemarks((prev) => ({ ...prev, expired: newRemarks }))

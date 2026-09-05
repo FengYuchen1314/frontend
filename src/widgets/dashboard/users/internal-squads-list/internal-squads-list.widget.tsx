@@ -1,10 +1,10 @@
 import { Checkbox, Stack, Text, TextInput } from '@mantine/core'
 import { GetInternalSquadsCommand } from '@remnawave/backend-contract'
-import { useVirtualizer } from '@tanstack/react-virtual'
-import { Key, memo, useRef } from 'react'
+import { Key, memo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { PiEmpty } from 'react-icons/pi'
 import { TbCirclesRelation } from 'react-icons/tb'
+import { Virtuoso } from 'react-virtuoso'
 
 import { InternalSquadCheckboxCard } from '../internal-squad-checkbox-card'
 
@@ -29,17 +29,7 @@ export const InternalSquadsListWidget = memo((props: IProps) => {
         hideEditButton,
         ...rest
     } = props
-
     const { t } = useTranslation()
-
-    const parentRef = useRef<HTMLDivElement>(null)
-
-    const virtualizer = useVirtualizer({
-        count: filteredInternalSquads.length,
-        getScrollElement: () => parentRef.current,
-        estimateSize: () => 60,
-        overscan: 10
-    })
 
     return (
         <Stack gap="md">
@@ -54,69 +44,40 @@ export const InternalSquadsListWidget = memo((props: IProps) => {
 
             <Checkbox.Group key={formKey} {...rest}>
                 <div
-                    ref={parentRef}
                     style={{
                         height:
                             filteredInternalSquads.length === 0
                                 ? 200
                                 : Math.min(200, filteredInternalSquads.length * 80),
-                        overflow: 'auto',
                         border: '1px solid var(--mantine-color-gray-7)',
                         borderRadius: '8px',
                         padding: '8px'
                     }}
                 >
-                    <div
-                        style={{
-                            height: `${virtualizer.getTotalSize()}px`,
-                            width: '100%',
-                            position: 'relative'
-                        }}
-                    >
-                        {virtualizer.getVirtualItems().length === 0 && (
-                            <div
-                                key="no-squads-found"
-                                style={{
-                                    height: '100%',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-
-                                    paddingTop: '80px'
-                                }}
-                            >
-                                <Stack align="center" gap="md">
-                                    <PiEmpty size={48} />
-                                    <Text c="dimmed" size="sm" ta="center">
-                                        {t('internal-squads-list.widget.no-squads-found')}
-                                    </Text>
-                                </Stack>
-                            </div>
-                        )}
-
-                        {virtualizer.getVirtualItems().map((virtualRow) => {
-                            const internalSquad = filteredInternalSquads[virtualRow.index]
-                            return (
-                                <div
-                                    key={internalSquad.uuid}
-                                    style={{
-                                        position: 'absolute',
-                                        top: 0,
-                                        left: 0,
-                                        width: '100%',
-                                        height: `${virtualRow.size}px`,
-                                        transform: `translateY(${virtualRow.start}px)`,
-                                        paddingBottom: '0px'
-                                    }}
-                                >
+                    {filteredInternalSquads.length === 0 ? (
+                        <Stack align="center" gap="md" h="100%" justify="center">
+                            <PiEmpty size={48} />
+                            <Text c="dimmed" size="sm" ta="center">
+                                {t('internal-squads-list.widget.no-squads-found')}
+                            </Text>
+                        </Stack>
+                    ) : (
+                        <Virtuoso
+                            computeItemKey={(_, squad) => squad.uuid}
+                            data={filteredInternalSquads}
+                            fixedItemHeight={60}
+                            increaseViewportBy={600}
+                            itemContent={(_, internalSquad) => (
+                                <div style={{ height: 60 }}>
                                     <InternalSquadCheckboxCard
                                         hideEditButton={hideEditButton}
                                         internalSquad={internalSquad}
                                     />
                                 </div>
-                            )
-                        })}
-                    </div>
+                            )}
+                            style={{ height: '100%' }}
+                        />
+                    )}
                 </div>
             </Checkbox.Group>
         </Stack>

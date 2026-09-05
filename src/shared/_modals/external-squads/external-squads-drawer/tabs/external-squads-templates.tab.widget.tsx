@@ -4,7 +4,7 @@ import {
     SUBSCRIPTION_TEMPLATE_TYPE,
     TSubscriptionTemplateType
 } from '@remnawave/backend-contract'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { TbDeviceFloppy } from 'react-icons/tb'
 
@@ -18,6 +18,10 @@ interface IProps {
 }
 
 export const ExternalSquadsTemplatesTabWidget = (props: IProps) => {
+    return <ExternalSquadsTemplatesForm key={props.externalSquad.uuid} {...props} />
+}
+
+const ExternalSquadsTemplatesForm = (props: IProps) => {
     const { externalSquad } = props
 
     const { t } = useTranslation()
@@ -34,13 +38,19 @@ export const ExternalSquadsTemplatesTabWidget = (props: IProps) => {
 
     const [selectedTemplates, setSelectedTemplates] = useState<
         Record<TSubscriptionTemplateType, null | string>
-    >({
-        [SUBSCRIPTION_TEMPLATE_TYPE.CLASH]: null,
-        [SUBSCRIPTION_TEMPLATE_TYPE.MIHOMO]: null,
-        [SUBSCRIPTION_TEMPLATE_TYPE.SINGBOX]: null,
-        [SUBSCRIPTION_TEMPLATE_TYPE.STASH]: null,
-        [SUBSCRIPTION_TEMPLATE_TYPE.XRAY_BASE64]: null,
-        [SUBSCRIPTION_TEMPLATE_TYPE.XRAY_JSON]: null
+    >(() => {
+        const initialTemplates: Record<TSubscriptionTemplateType, null | string> = {
+            [SUBSCRIPTION_TEMPLATE_TYPE.CLASH]: null,
+            [SUBSCRIPTION_TEMPLATE_TYPE.MIHOMO]: null,
+            [SUBSCRIPTION_TEMPLATE_TYPE.SINGBOX]: null,
+            [SUBSCRIPTION_TEMPLATE_TYPE.STASH]: null,
+            [SUBSCRIPTION_TEMPLATE_TYPE.XRAY_BASE64]: null,
+            [SUBSCRIPTION_TEMPLATE_TYPE.XRAY_JSON]: null
+        }
+        for (const template of externalSquad.templates ?? []) {
+            initialTemplates[template.templateType] = template.templateUuid
+        }
+        return initialTemplates
     })
 
     const groupedTemplates = useMemo(() => {
@@ -65,25 +75,6 @@ export const ExternalSquadsTemplatesTabWidget = (props: IProps) => {
             >
         )
     }, [templatesData?.templates])
-
-    useEffect(() => {
-        const initialTemplates: Record<TSubscriptionTemplateType, null | string> = {
-            [SUBSCRIPTION_TEMPLATE_TYPE.CLASH]: null,
-            [SUBSCRIPTION_TEMPLATE_TYPE.MIHOMO]: null,
-            [SUBSCRIPTION_TEMPLATE_TYPE.SINGBOX]: null,
-            [SUBSCRIPTION_TEMPLATE_TYPE.STASH]: null,
-            [SUBSCRIPTION_TEMPLATE_TYPE.XRAY_BASE64]: null,
-            [SUBSCRIPTION_TEMPLATE_TYPE.XRAY_JSON]: null
-        }
-
-        if (externalSquad.templates && Array.isArray(externalSquad.templates)) {
-            externalSquad.templates.forEach((template) => {
-                initialTemplates[template.templateType] = template.templateUuid
-            })
-        }
-
-        setSelectedTemplates(initialTemplates)
-    }, [externalSquad])
 
     const { mutate: updateExternalSquad, isPending: isUpdatingExternalSquad } =
         useUpdateExternalSquad({

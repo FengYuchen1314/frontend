@@ -1,9 +1,9 @@
 import type { IProps } from './interfaces/props.interface'
 
 import { Box, Center, Checkbox, Text } from '@mantine/core'
-import { useVirtualizer } from '@tanstack/react-virtual'
-import { memo, useEffect, useMemo, useRef } from 'react'
+import { memo, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Virtuoso } from 'react-virtuoso'
 
 import { FlatInboundCheckboxCardShared } from '../flat-inbound-checkbox-card/flat-inbound-checkbox-card.shared'
 
@@ -24,22 +24,6 @@ export const VirtualizedFlatInboundsListShared = memo((props: IProps) => {
         }
     }, [allInbounds, selectedInbounds, filterType])
 
-    const parentRef = useRef<HTMLDivElement>(null)
-
-    const virtualizer = useVirtualizer({
-        count: filteredInbounds.length,
-        getScrollElement: () => parentRef.current,
-        estimateSize: () => INBOUND_HEIGHT,
-        overscan: 5
-    })
-
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            virtualizer.measure()
-        }, 0)
-        return () => clearTimeout(timer)
-    }, [virtualizer])
-
     if (filteredInbounds.length === 0) {
         return (
             <Center h="100%">
@@ -52,51 +36,32 @@ export const VirtualizedFlatInboundsListShared = memo((props: IProps) => {
 
     return (
         <Box
-            ref={parentRef}
             style={{
                 height: '100%',
-                overflow: 'auto',
                 border: '1px solid var(--mantine-color-gray-7)',
                 borderRadius: '8px',
                 padding: '8px'
             }}
         >
-            <Box
-                style={{
-                    height: `${virtualizer.getTotalSize()}px`,
-                    width: '100%',
-                    position: 'relative'
-                }}
-            >
-                <Checkbox.Group>
-                    {virtualizer.getVirtualItems().map((virtualItem) => {
-                        const { inbound, profileName } = filteredInbounds[virtualItem.index]
-                        const isSelected = selectedInbounds.has(inbound.uuid)
-
-                        return (
-                            <div
-                                key={inbound.uuid}
-                                style={{
-                                    position: 'absolute',
-                                    top: 0,
-                                    left: 0,
-                                    width: '100%',
-                                    height: `${virtualItem.size}px`,
-                                    transform: `translateY(${virtualItem.start}px)`,
-                                    paddingBottom: '4px'
-                                }}
-                            >
-                                <FlatInboundCheckboxCardShared
-                                    inbound={inbound}
-                                    isSelected={isSelected}
-                                    onInboundToggle={onInboundToggle}
-                                    profileName={profileName}
-                                />
-                            </div>
-                        )
-                    })}
-                </Checkbox.Group>
-            </Box>
+            <Checkbox.Group style={{ height: '100%' }}>
+                <Virtuoso
+                    computeItemKey={(_, { inbound }) => inbound.uuid}
+                    data={filteredInbounds}
+                    fixedItemHeight={INBOUND_HEIGHT}
+                    increaseViewportBy={INBOUND_HEIGHT * 5}
+                    itemContent={(_, { inbound, profileName }) => (
+                        <div style={{ height: INBOUND_HEIGHT, paddingBottom: '4px' }}>
+                            <FlatInboundCheckboxCardShared
+                                inbound={inbound}
+                                isSelected={selectedInbounds.has(inbound.uuid)}
+                                onInboundToggle={onInboundToggle}
+                                profileName={profileName}
+                            />
+                        </div>
+                    )}
+                    style={{ height: '100%' }}
+                />
+            </Checkbox.Group>
         </Box>
     )
 })

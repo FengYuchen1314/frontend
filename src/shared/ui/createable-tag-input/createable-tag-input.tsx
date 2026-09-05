@@ -1,7 +1,7 @@
 import type { IProps } from './interfaces/props.interface'
 
 import { CloseButton, Combobox, InputBase, useCombobox } from '@mantine/core'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { PiTagDuotone } from 'react-icons/pi'
 
 export function CreateableTagInputShared(props: IProps) {
@@ -10,9 +10,18 @@ export function CreateableTagInputShared(props: IProps) {
         onDropdownClose: () => combobox.resetSelectedOption()
     })
 
-    const [data, setData] = useState(tags)
-    const [search, setSearch] = useState(value?.toString() || '')
+    const [createdTags, setCreatedTags] = useState<string[]>([])
+    const data = [...new Set([...tags, ...createdTags])]
+    const [search, setSearch] = useState(value === undefined ? (defaultValue ?? '') : (value ?? ''))
     const [error, setError] = useState('')
+    const [previousValue, setPreviousValue] = useState(value)
+
+    // Only an actual controlled-value change resets the search, not a tags query refresh.
+    if (previousValue !== value) {
+        setPreviousValue(value)
+        setSearch(value ?? '')
+        setError('')
+    }
 
     const validateTag = (tag: string) => {
         if (!/^[A-Z0-9_]+$/.test(tag)) {
@@ -23,14 +32,6 @@ export function CreateableTagInputShared(props: IProps) {
         }
         return null
     }
-
-    useEffect(() => {
-        setData(tags)
-    }, [tags])
-
-    useEffect(() => {
-        setSearch(value?.toString() || '')
-    }, [value])
 
     const exactOptionMatch = data.some((item) => item === search)
     const filteredOptions = exactOptionMatch
@@ -52,7 +53,7 @@ export function CreateableTagInputShared(props: IProps) {
                         setError(validationError)
                         return
                     }
-                    setData((current) => [...current, search])
+                    setCreatedTags((current) => [...new Set([...current, search])])
                     onChange?.(search)
                     setError('')
                 } else {

@@ -1,8 +1,8 @@
 import { Box, Center, Loader, MantineStyleProp, Stack, Text, ThemeIcon } from '@mantine/core'
-import { useVirtualizer } from '@tanstack/react-virtual'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { TbCreditCard } from 'react-icons/tb'
+import { Virtuoso } from 'react-virtuoso'
 
 import { SectionCard } from '@shared/ui/section-card'
 
@@ -16,10 +16,19 @@ type Row =
     | { key: string; label: string; total: number; type: 'divider' }
     | { key: string; record: BillingRecord; type: 'record' }
 
-const DIVIDER_ESTIMATE = 34
 const RECORD_ESTIMATE = 72
 const ROW_GAP = 8
 const REACH_BOTTOM_THRESHOLD = 300
+
+function LoadingFooter({ context }: { context?: { isLoadingMore: boolean } }) {
+    return context?.isLoadingMore ? (
+        <Center py="sm">
+            <Loader size="sm" />
+        </Center>
+    ) : null
+}
+
+const LIST_COMPONENTS = { Footer: LoadingFooter }
 
 interface IProps {
     height: string
@@ -56,18 +65,11 @@ export function VirtualizedRecordsList(props: IProps) {
         return result
     }, [records, i18n.language])
 
-    const scrollRef = useRef<HTMLDivElement>(null)
+    const scrollRef = useRef<HTMLElement | null>(null)
     const [fade, setFade] = useState({ bottom: false, top: false })
-
-    // eslint-disable-next-line react-hooks/incompatible-library
-    const virtualizer = useVirtualizer({
-        count: rows.length,
-        getScrollElement: () => scrollRef.current,
-        getItemKey: (index) => rows[index].key,
-        estimateSize: (index) =>
-            rows[index].type === 'divider' ? DIVIDER_ESTIMATE : RECORD_ESTIMATE,
-        overscan: 8
-    })
+    const setScrollElement = useCallback((element: HTMLElement | Window | null) => {
+        scrollRef.current = element instanceof HTMLElement ? element : null
+    }, [])
 
     const updateFade = useCallback(() => {
         const el = scrollRef.current
@@ -78,19 +80,16 @@ export function VirtualizedRecordsList(props: IProps) {
         const { scrollTop, scrollHeight, clientHeight } = el
         const isScrollable = scrollHeight - clientHeight > 1
 
-        setFade({
-            top: isScrollable && scrollTop > 4,
-            bottom: isScrollable && scrollTop + clientHeight < scrollHeight - 4
-        })
+        const top = isScrollable && scrollTop > 4
+        const bottom = isScrollable && scrollTop + clientHeight < scrollHeight - 4
+        setFade((previous) =>
+            previous.top === top && previous.bottom === bottom ? previous : { top, bottom }
+        )
 
-        if (isScrollable && scrollTop + clientHeight >= scrollHeight - REACH_BOTTOM_THRESHOLD) {
+        if (!isLoadingMore && scrollTop + clientHeight >= scrollHeight - REACH_BOTTOM_THRESHOLD) {
             onReachBottom()
         }
-    }, [onReachBottom])
-
-    useEffect(() => {
-        updateFade()
-    }, [updateFade, rows.length])
+    }, [isLoadingMore, onReachBottom])
 
     if (records.length === 0) {
         return (
@@ -121,47 +120,28 @@ export function VirtualizedRecordsList(props: IProps) {
         undefined
 
     return (
-        <Box
-            className={fadeClassName}
-            onScroll={updateFade}
-            ref={scrollRef}
-            style={{ height, overflowX: 'hidden', overflowY: 'auto', ...style }}
-        >
-            <Box
-                style={{ height: virtualizer.getTotalSize(), position: 'relative', width: '100%' }}
-            >
-                {virtualizer.getVirtualItems().map((virtualItem) => {
-                    const row = rows[virtualItem.index]
-
-                    return (
-                        <Box
-                            data-index={virtualItem.index}
-                            key={row.key}
-                            ref={virtualizer.measureElement}
-                            style={{
-                                left: 0,
-                                paddingBottom: ROW_GAP,
-                                position: 'absolute',
-                                top: 0,
-                                transform: `translateY(${virtualItem.start}px)`,
-                                width: '100%'
-                            }}
-                        >
-                            {row.type === 'divider' ? (
-                                <MonthDivider label={row.label} total={row.total} />
-                            ) : (
-                                <RecordCard onDelete={handleDelete} record={row.record} />
-                            )}
-                        </Box>
-                    )
-                })}
-            </Box>
-
-            {isLoadingMore && (
-                <Center py="sm">
-                    <Loader size="sm" />
-                </Center>
-            )}
+        <Box className={fadeClassName} style={{ height, ...style }}>
+            <Virtuoso
+                components={LIST_COMPONENTS}
+                computeItemKey={(_, row) => row.key}
+                context={{ isLoadingMore }}
+                data={rows}
+                defaultItemHeight={RECORD_ESTIMATE}
+                increaseViewportBy={RECORD_ESTIMATE * 8}
+                itemContent={(_, row) => (
+                    <Box style={{ paddingBottom: ROW_GAP }}>
+                        {row.type === 'divider' ? (
+                            <MonthDivider label={row.label} total={row.total} />
+                        ) : (
+                            <RecordCard onDelete={handleDelete} record={row.record} />
+                        )}
+                    </Box>
+                )}
+                onScroll={updateFade}
+                scrollerRef={setScrollElement}
+                style={{ height: '100%', overflowX: 'hidden' }}
+                totalListHeightChanged={updateFade}
+            />
         </Box>
     )
 }

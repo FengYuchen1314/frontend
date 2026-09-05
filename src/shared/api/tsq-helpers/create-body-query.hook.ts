@@ -1,9 +1,11 @@
 import { QueryKey, useQuery, UseQueryResult } from '@tanstack/react-query'
+import { isCancel } from 'axios'
 import { z } from 'zod'
 
 import { instance } from '../axios'
 import { createUrl, handleRequestError } from '../helpers'
 import { CreateBodyQueryHookArgs } from '../interfaces'
+import { requestSessionResponse } from '../session-response'
 
 type QueryParams<R, Q, B> = {
     body?: B
@@ -47,31 +49,36 @@ export function createBodyQueryHook<
         >
     ) => QueryKey
 }) {
-    const queryFn = async (params?: {
-        body?: z.infer<BodySchema>
-        query?: z.infer<RequestQuerySchema>
-        route?: z.infer<RouteParamsSchema>
-    }) => {
+    const queryFn = async (
+        params:
+            | {
+                  body?: z.infer<BodySchema>
+                  query?: z.infer<RequestQuerySchema>
+                  route?: z.infer<RouteParamsSchema>
+              }
+            | undefined,
+        signal: AbortSignal
+    ) => {
         const validatedQuery = requestQuerySchema?.parse({ ...queryParams, ...params?.query })
 
         const url = createUrl(endpoint, validatedQuery, params?.route ?? routeParams)
 
         const data = bodySchema ? bodySchema.parse(params?.body) : params?.body
 
-        return instance
-            .request<z.infer<ResponseSchema>>({
-                method: requestMethod,
-                url,
-                data
-            })
-            .then(async (response) => {
-                const result = await responseSchema.safeParseAsync(response.data)
-                if (!result.success) {
-                    throw result.error
-                }
-                return result.data.response
-            })
-            .catch((error) => errorHandler?.(error) ?? handleRequestError(error))
+        return requestSessionResponse(
+            () =>
+                instance.request({
+                    method: requestMethod,
+                    url,
+                    data,
+                    signal
+                }),
+            responseSchema
+        ).catch((error) => {
+            if (isCancel(error)) throw error
+            errorHandler?.(error)
+            return handleRequestError(error)
+        })
     }
 
     return (params?: {
@@ -88,6 +95,6 @@ export function createBodyQueryHook<
                 query: params?.query,
                 body: params?.body
             }),
-            queryFn: () => queryFn(params)
+            queryFn: ({ signal }) => queryFn(params, signal)
         }) as UseQueryResult<z.infer<ResponseSchema>['response']>
 }

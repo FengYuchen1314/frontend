@@ -1,9 +1,11 @@
 import { notifications } from '@mantine/notifications'
-import { AxiosError } from 'axios'
+import { AxiosError, isCancel } from 'axios'
 
 const BYPASS_ERROR_STATUSES = [401, 403]
 
 export function errorHandler(error: unknown, title: string) {
+    if (isCancel(error)) return
+
     if (error instanceof AxiosError) {
         if (error.response) {
             if (BYPASS_ERROR_STATUSES.includes(error.response.status)) {

@@ -1,9 +1,11 @@
-import { isAxiosError } from 'axios'
+import { isAxiosError, isCancel } from 'axios'
 import { consola } from 'consola/browser'
 import { ZodError } from 'zod'
 
 /** Handle request errors */
 export function handleRequestError(error: unknown): never {
+    if (isCancel(error)) throw error
+
     if (isAxiosError(error)) {
         const errorData = error.response?.data
         const enhancedError = new Error(errorData?.message || 'Request failed')

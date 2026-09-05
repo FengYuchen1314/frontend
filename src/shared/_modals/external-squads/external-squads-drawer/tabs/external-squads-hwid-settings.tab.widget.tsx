@@ -16,7 +16,7 @@ import {
     HwidSettingsSchema,
     THwidSettings
 } from '@remnawave/backend-contract'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { TbDeviceFloppy, TbDevices2 } from 'react-icons/tb'
 
@@ -30,35 +30,25 @@ interface IProps {
 
 export const ExternalSquadsHwidSettingsTabWidget = (props: IProps) => {
     const { externalSquad } = props
+    return <ExternalSquadsHwidSettingsForm key={externalSquad.uuid} {...props} />
+}
+
+const ExternalSquadsHwidSettingsForm = (props: IProps) => {
+    const { externalSquad } = props
     const { t } = useTranslation()
 
-    const [isOverrideEnabled, setIsOverrideEnabled] = useState<boolean>(false)
-    const [hwidSettings, setHwidSettings] = useState<THwidSettings>({
-        enabled: false,
-        fallbackDeviceLimit: 999,
-        maxDevicesAnnounce: null
+    const [isOverrideEnabled, setIsOverrideEnabled] = useState(!!externalSquad.hwidSettings)
+    const [hwidSettings, setHwidSettings] = useState<THwidSettings>(() => {
+        const currentSettings = externalSquad.hwidSettings
+        return currentSettings
+            ? {
+                  enabled: currentSettings.enabled ?? false,
+                  fallbackDeviceLimit: currentSettings.fallbackDeviceLimit ?? 0,
+                  maxDevicesAnnounce: currentSettings.maxDevicesAnnounce ?? null
+              }
+            : { enabled: false, fallbackDeviceLimit: 999, maxDevicesAnnounce: null }
     })
     const [errors, setErrors] = useState<Record<string, string>>({})
-
-    useEffect(() => {
-        const currentSettings = externalSquad.hwidSettings
-        if (currentSettings) {
-            setIsOverrideEnabled(true)
-            setHwidSettings({
-                enabled: currentSettings.enabled ?? false,
-                fallbackDeviceLimit: currentSettings.fallbackDeviceLimit ?? 0,
-                maxDevicesAnnounce: currentSettings.maxDevicesAnnounce ?? null
-            })
-        } else {
-            setIsOverrideEnabled(false)
-            setHwidSettings({
-                enabled: false,
-                fallbackDeviceLimit: 999,
-                maxDevicesAnnounce: null
-            })
-        }
-        setErrors({})
-    }, [externalSquad])
 
     const { mutate: updateExternalSquad, isPending: isUpdatingExternalSquad } =
         useUpdateExternalSquad({

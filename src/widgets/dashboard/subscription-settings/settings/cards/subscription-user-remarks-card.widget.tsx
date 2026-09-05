@@ -24,16 +24,14 @@ interface IProps {
 }
 
 export const SubscriptionUserRemarksCardWidget = (props: IProps) => {
+    return <SubscriptionUserRemarksForm key={props.subscriptionSettings.uuid} {...props} />
+}
+
+const SubscriptionUserRemarksForm = (props: IProps) => {
     const { subscriptionSettings } = props
     const { t } = useTranslation()
 
     const [remarks, setRemarks] = useState(() => computeRemarks(subscriptionSettings))
-
-    const [prevSettings, setPrevSettings] = useState(subscriptionSettings)
-    if (subscriptionSettings !== prevSettings) {
-        setPrevSettings(subscriptionSettings)
-        setRemarks(computeRemarks(subscriptionSettings))
-    }
 
     const updateExpiredRemarks = (newRemarks: string[]) => {
         setRemarks((prev) => ({ ...prev, expired: newRemarks }))
@@ -75,8 +73,6 @@ export const SubscriptionUserRemarksCardWidget = (props: IProps) => {
                     QueryKeys.subscriptionSettings.getSubscriptionSettings.queryKey,
                     data
                 )
-
-                setRemarks(computeRemarks(data))
             },
 
             onError(error) {

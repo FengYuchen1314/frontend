@@ -1,9 +1,11 @@
 import { QueryKey, useQuery, UseQueryResult } from '@tanstack/react-query'
+import { isCancel } from 'axios'
 import { z } from 'zod'
 
 import { instance } from '../axios'
 import { createUrl, handleRequestError } from '../helpers'
 import { CreateGetQueryHookArgs } from '../interfaces'
+import { requestSessionResponse } from '../session-response'
 
 type QueryParams<R, Q> = {
     query?: Q
@@ -93,25 +95,27 @@ export function createGetQueryHook<
         params: QueryParams<z.infer<RouteParamsSchema>, z.infer<RequestQuerySchema>>
     ) => QueryKey
 }) {
-    const queryFn = async (params?: {
-        errorHandler?: ErrorHandler
-        query?: z.infer<RequestQuerySchema>
-        route?: z.infer<RouteParamsSchema>
-    }) => {
+    const queryFn = async (
+        params:
+            | {
+                  errorHandler?: ErrorHandler
+                  query?: z.infer<RequestQuerySchema>
+                  route?: z.infer<RouteParamsSchema>
+              }
+            | undefined,
+        signal: AbortSignal
+    ) => {
         const validatedQuery = requestQuerySchema?.parse({ ...queryParams, ...params?.query })
 
         const url = createUrl(endpoint, validatedQuery, params?.route ?? routeParams)
 
-        return instance
-            .get<z.infer<ResponseSchema>>(url)
-            .then(async (response) => {
-                const result = await responseSchema.safeParseAsync(response.data)
-                if (!result.success) {
-                    throw result.error
-                }
-                return result.data.response
-            })
-            .catch((error) => errorHandler?.(error) ?? handleRequestError(error))
+        return requestSessionResponse(() => instance.get(url, { signal }), responseSchema).catch(
+            (error) => {
+                if (isCancel(error)) throw error
+                errorHandler?.(error)
+                return handleRequestError(error)
+            }
+        )
     }
 
     return (params?: {
@@ -126,6 +130,6 @@ export function createGetQueryHook<
                 route: params?.route,
                 query: params?.query
             }),
-            queryFn: () => queryFn(params)
+            queryFn: ({ signal }) => queryFn(params, signal)
         }) as UseQueryResult<z.infer<ResponseSchema>['response']>
 }

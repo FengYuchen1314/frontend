@@ -15,7 +15,7 @@ import {
 } from '@mantine/core'
 import { GetExternalSquadByUuidCommand } from '@remnawave/backend-contract'
 import { TFunction } from 'i18next'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { PiPlus, PiTrash } from 'react-icons/pi'
 import { TbDeviceFloppy } from 'react-icons/tb'
@@ -51,29 +51,25 @@ interface IProps<T extends Record<string, unknown>> {
 }
 
 export function ExternalSquadOverridesTab<T extends Record<string, unknown>>(props: IProps<T>) {
+    // A refetch may replace the record object while this form has an unsaved draft.
+    // Reset only when switching the record or the kind of override being edited.
+    return (
+        <ExternalSquadOverridesForm
+            key={`${props.externalSquad.uuid}:${props.config.overrideKey}`}
+            {...props}
+        />
+    )
+}
+
+function ExternalSquadOverridesForm<T extends Record<string, unknown>>(props: IProps<T>) {
     const { externalSquad, config } = props
     const { t } = useTranslation()
 
-    const [overrides, setOverrides] = useState<T>({} as T)
+    const [overrides, setOverrides] = useState<T>(
+        () => config.getCurrentOverrides(externalSquad) ?? ({} as T)
+    )
     const [errors, setErrors] = useState<Record<string, string>>({})
-    const [fieldOrder, setFieldOrder] = useState<string[]>([])
-
-    useEffect(() => {
-        const currentOverrides = config.getCurrentOverrides(externalSquad)
-        if (currentOverrides) {
-            const newKeys = Object.keys(currentOverrides)
-            const preservedOrder = fieldOrder.filter((key) => newKeys.includes(key))
-            const newFields = newKeys.filter((key) => !fieldOrder.includes(key))
-
-            setFieldOrder([...preservedOrder, ...newFields])
-            setOverrides(currentOverrides)
-        } else {
-            setFieldOrder([])
-            setOverrides({} as T)
-        }
-
-        setErrors({})
-    }, [externalSquad, config])
+    const [fieldOrder, setFieldOrder] = useState<string[]>(() => Object.keys(overrides))
 
     const { mutate: updateExternalSquad, isPending: isUpdatingExternalSquad } =
         useUpdateExternalSquad({
@@ -239,10 +235,10 @@ export function ExternalSquadOverridesTab<T extends Record<string, unknown>>(pro
                             </Group>
                         }
                         leftSection={leftSection}
-                        onChange={(val) => handleUpdateOverride(field, Number(val))}
+                        onChange={(val) => handleUpdateOverride(field, val)}
                         rightSection={rightSection}
                         size="sm"
-                        value={Number(value) || undefined}
+                        value={typeof value === 'number' ? value : ''}
                     />
                 )
             case 'string':

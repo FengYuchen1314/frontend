@@ -4,11 +4,13 @@ import {
     useInfiniteQuery,
     UseInfiniteQueryResult
 } from '@tanstack/react-query'
+import { isCancel } from 'axios'
 import { z } from 'zod'
 
 import { instance } from '../axios'
 import { createUrl, handleRequestError } from '../helpers'
 import { CreateGetQueryHookArgs } from '../interfaces'
+import { requestSessionResponse } from '../session-response'
 
 type QueryParams<R, Q> = {
     query?: Q
@@ -90,10 +92,13 @@ export function createGetInfiniteQueryHook<
 
     const queryFn = async (
         pageParam: TPageParam,
-        params?: {
-            query?: z.infer<RequestQuerySchema>
-            route?: z.infer<RouteParamsSchema>
-        }
+        params:
+            | {
+                  query?: z.infer<RequestQuerySchema>
+                  route?: z.infer<RouteParamsSchema>
+              }
+            | undefined,
+        signal: AbortSignal
     ): Promise<Response> => {
         const pageQuery =
             pageParam === undefined || pageParam === null
@@ -106,13 +111,9 @@ export function createGetInfiniteQueryHook<
         const url = createUrl(endpoint, validatedQuery, params?.route ?? routeParams)
 
         try {
-            const response = await instance.get<z.infer<ResponseSchema>>(url)
-            const result = await responseSchema.safeParseAsync(response.data)
-            if (!result.success) {
-                throw result.error
-            }
-            return result.data.response
+            return await requestSessionResponse(() => instance.get(url, { signal }), responseSchema)
         } catch (error) {
+            if (isCancel(error)) throw error
             if (errorHandler) {
                 errorHandler(error)
             } else {
@@ -134,7 +135,7 @@ export function createGetInfiniteQueryHook<
                 route: params?.route,
                 query: params?.query
             }),
-            queryFn: ({ pageParam }) => queryFn(pageParam as TPageParam, params),
+            queryFn: ({ pageParam, signal }) => queryFn(pageParam as TPageParam, params, signal),
             initialPageParam,
             getNextPageParam
         }) as UseInfiniteQueryResult<InfiniteData<Response, TPageParam>>
