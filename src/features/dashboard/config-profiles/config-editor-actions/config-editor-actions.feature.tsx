@@ -190,7 +190,7 @@ export function ConfigEditorActionsFeature(props: Props) {
         <Group grow={isMobile} preventGrowOverflow={false} wrap="wrap">
             <Button
                 color={!hasUnsavedChanges ? 'gray' : 'teal'}
-                disabled={!isConfigValid && !hasUnsavedChanges}
+                disabled={!isConfigValid || !hasUnsavedChanges}
                 leftSection={<PiFloppyDisk size={16} />}
                 loading={isUpdating}
                 onClick={handleSave}

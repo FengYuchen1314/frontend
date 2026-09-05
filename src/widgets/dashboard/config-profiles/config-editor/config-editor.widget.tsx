@@ -250,7 +250,10 @@ export function ConfigEditorWidget(props: IProps) {
                         configProfile={configProfile}
                         editorRef={editorRef}
                         hasUnsavedChanges={hasUnsavedChanges}
-                        isConfigValid={isConfigValid}
+                        isConfigValid={
+                            isConfigValid &&
+                            (isMieruConfig || (!isWasmCrashed && !isWasmRestarting))
+                        }
                         originalValue={originalValue}
                         setHasUnsavedChanges={setHasUnsavedChanges}
                         setIsConfigValid={setIsConfigValid}

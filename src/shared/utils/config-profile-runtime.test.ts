@@ -47,3 +47,26 @@ test('the profile query connector gates the Xray loader after resolving the runt
     assert.match(text, /<XrayConfigProfileEditor\s+key=\{configProfile\.uuid\}/)
     assert.match(text, /<ConfigProfileByUuidPageComponent\s+key=\{configProfile\.uuid\}/)
 })
+
+test('unavailable Xray validation cannot silently bypass the explicit save-anyway confirmation', () => {
+    const widget = readFileSync(
+        new URL(
+            '../../widgets/dashboard/config-profiles/config-editor/config-editor.widget.tsx',
+            import.meta.url
+        ),
+        'utf8'
+    )
+    const actions = readFileSync(
+        new URL(
+            '../../features/dashboard/config-profiles/config-editor-actions/config-editor-actions.feature.tsx',
+            import.meta.url
+        ),
+        'utf8'
+    )
+    assert.match(
+        widget,
+        /isConfigValid=\{\s*isConfigValid &&\s*\(isMieruConfig \|\| \(!isWasmCrashed && !isWasmRestarting\)\)/
+    )
+    assert.match(actions, /disabled=\{!isConfigValid \|\| !hasUnsavedChanges\}/)
+    assert.match(actions, /modals\.openConfirmModal\([\s\S]*onConfirm: handleSave/)
+})

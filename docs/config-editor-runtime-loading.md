@@ -19,3 +19,7 @@ and changed-file lint are required; Actions compilation and a blocked-WASM brows
 test for direct navigation, cached Mieru navigation and the Xray failure/retry path
 remain pending. Existing unrelated full-repository lint errors are not hidden by
 this change.
+
+Normal Save now requires a dirty, validated config and an available runtime
+(Mieru does not require WASM). Invalid/unavailable Xray validation retains the
+upstream Save Anyway confirmation rather than silently enabling normal Save.
