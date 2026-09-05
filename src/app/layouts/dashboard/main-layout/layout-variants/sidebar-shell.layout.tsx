@@ -1,100 +1,89 @@
-import { AppShell, Box, Burger, Container, Group, ScrollArea } from '@mantine/core'
-import clsx from 'clsx'
+import type { ReactNode } from 'react'
+
+import { Button, Modal } from '@heroui/react'
+import { TbMenu2, TbX } from 'react-icons/tb'
 
 import { LayoutBrand, LayoutMain } from '../layout-shared'
 import classes from '../layout.module.css'
 import { MobileNavigation } from '../navbar/mobile-navigation.layout'
 
 interface IProps {
-    closedSide: 'desktop' | 'mobile'
-    footer?: React.ReactNode
-    headerControls: React.ReactNode
-    navbarRef?: React.Ref<HTMLDivElement>
-    onNavClose?: () => void
+    mode: 'desktop' | 'mobile'
+    footer?: ReactNode
+    headerControls: ReactNode
     opened: boolean
-    padding: string
-    toggle: () => void
-    withFadeIn?: boolean
+    onOpenChange: (opened: boolean) => void
 }
 
-export const SidebarShellLayout = (props: IProps) => {
-    const {
-        closedSide,
-        footer,
-        headerControls,
-        navbarRef,
-        onNavClose,
-        opened,
-        padding,
-        toggle,
-        withFadeIn
-    } = props
-
-    const navbarCollapsed =
-        closedSide === 'mobile'
-            ? { mobile: !opened, desktop: true }
-            : { mobile: false, desktop: !opened }
-
-    const closedClass =
-        closedSide === 'mobile'
-            ? classes.sidebarWrapperClosedMobile
-            : classes.sidebarWrapperClosedDesktop
+export const SidebarShellLayout = ({
+    mode,
+    footer,
+    headerControls,
+    opened,
+    onOpenChange
+}: IProps) => {
+    const mobile = mode === 'mobile'
+    const contents = (
+        <>
+            <div className={classes.logoSection}>
+                <LayoutBrand />
+            </div>
+            <div className={classes.scrollArea}>
+                <MobileNavigation onClose={mobile ? () => onOpenChange(false) : undefined} />
+            </div>
+            {footer && <div className={classes.footerSection}>{footer}</div>}
+        </>
+    )
 
     return (
-        <AppShell
-            className={withFadeIn ? classes.appShellFadeIn : undefined}
-            header={{ height: 64, collapsed: false, offset: false }}
-            layout="alt"
-            navbar={{ width: 300, breakpoint: 'lg', collapsed: navbarCollapsed }}
-            padding={padding}
-            transitionDuration={500}
-            transitionTimingFunction="ease-in-out"
-        >
-            <AppShell.Header className={classes.header} withBorder={false}>
-                <Container fluid px="lg" py="xs">
-                    <Group justify="space-between" style={{ flexWrap: 'nowrap' }}>
-                        <Group style={{ flex: 1, justifyContent: 'flex-start' }}>
-                            <Burger onClick={toggle} opened={opened} size="md" />
-                        </Group>
-                        <Group style={{ flexShrink: 0 }}>{headerControls}</Group>
-                    </Group>
-                </Container>
-            </AppShell.Header>
-
-            <AppShell.Navbar
-                className={clsx(classes.sidebarWrapper, { [closedClass]: !opened })}
-                p="md"
-                pb={0}
-                ref={navbarRef}
-                w={300}
-                withBorder={false}
-            >
-                <AppShell.Section className={classes.logoSection}>
-                    <Box style={{ position: 'absolute', left: '0' }}>
-                        <Burger hiddenFrom="lg" onClick={toggle} opened={opened} size="sm" />
-                    </Box>
-
-                    <LayoutBrand gap="xs" justify="center" wrap="nowrap" />
-                </AppShell.Section>
-
-                <AppShell.Section
-                    className={classes.scrollArea}
-                    component={ScrollArea}
-                    flex={1}
-                    scrollbarSize="0.2rem"
-                >
-                    <MobileNavigation onClose={onNavClose} />
-                </AppShell.Section>
-
-                {footer && (
-                    <AppShell.Section className={classes.footerSection}>{footer}</AppShell.Section>
-                )}
-            </AppShell.Navbar>
-
-            <LayoutMain
-                pb="var(--mantine-spacing-md)"
-                pt="calc(var(--app-shell-header-height) + 10px)"
-            />
-        </AppShell>
+        <div className={classes.shell} data-layout={mode} data-sidebar-open={!mobile && opened}>
+            <a className={classes.skipLink} href="#dashboard-main">
+                Skip to content
+            </a>
+            <header className={classes.header}>
+                <div className={classes.brandRow}>
+                    <Button
+                        aria-label={opened ? 'Close navigation' : 'Open navigation'}
+                        aria-expanded={opened}
+                        aria-controls={opened ? 'dashboard-sidebar' : undefined}
+                        isIconOnly
+                        onPress={() => onOpenChange(!opened)}
+                        variant="ghost"
+                    >
+                        {opened ? <TbX size={22} /> : <TbMenu2 size={22} />}
+                    </Button>
+                    <div className={classes.headerControls}>{headerControls}</div>
+                </div>
+            </header>
+            {mobile ? (
+                <Modal.Backdrop isOpen={opened} onOpenChange={onOpenChange}>
+                    <Modal.Container
+                        className={classes.mobileContainer}
+                        placement="top"
+                        scroll="inside"
+                    >
+                        <Modal.Dialog
+                            aria-label="Navigation"
+                            className={classes.mobileDialog}
+                            id="dashboard-sidebar"
+                        >
+                            <Modal.CloseTrigger aria-label="Close navigation" />
+                            {contents}
+                        </Modal.Dialog>
+                    </Modal.Container>
+                </Modal.Backdrop>
+            ) : (
+                opened && (
+                    <aside
+                        aria-label="Navigation"
+                        className={classes.sidebarWrapper}
+                        id="dashboard-sidebar"
+                    >
+                        {contents}
+                    </aside>
+                )
+            )}
+            <LayoutMain />
+        </div>
     )
 }

@@ -1,48 +1,30 @@
-import { Image } from '@mantine/core'
-import { useNavigate } from 'react-router'
+import { Link } from 'react-router'
 
 import { useGetAuthStatus } from '@shared/api/hooks/auth/auth.query.hooks'
-import { ROUTES } from '@shared/constants'
+import { ROUTES } from '@shared/constants/routes'
 
 import { Logo } from '../logo'
 import classes from './sidebar.module.css'
 
 export const SidebarLogoShared = () => {
     const { data: authStatus } = useGetAuthStatus()
-
-    const navigate = useNavigate()
-
-    const handleClick = () => {
-        navigate(ROUTES.DASHBOARD.HOME)
-    }
-
-    if (authStatus?.branding.logoUrl) {
-        return (
-            <Image
-                alt="logo"
-                className={classes.fadeIn}
-                fallbackSrc="/favicons/logo.svg"
-                fit="contain"
-                onClick={handleClick}
-                src={authStatus.branding.logoUrl}
-                style={{
-                    maxWidth: '30px',
-                    maxHeight: '30px',
-                    width: '30px',
-                    height: '30px',
-                    cursor: 'pointer'
-                }}
-            />
-        )
-    }
-
     return (
-        <Logo
-            color="var(--accent)"
-            className={classes.fadeIn}
-            onClick={handleClick}
-            style={{ cursor: 'pointer' }}
-            size="2.5rem"
-        />
+        <Link aria-label="Home" className={classes.logoLink} to={ROUTES.DASHBOARD.HOME}>
+            {authStatus?.branding.logoUrl ? (
+                <img
+                    alt=""
+                    className={classes.brandImage}
+                    key={authStatus.branding.logoUrl}
+                    onError={(event) => {
+                        if (event.currentTarget.dataset.fallbackApplied) return
+                        event.currentTarget.dataset.fallbackApplied = 'true'
+                        event.currentTarget.src = '/favicons/logo.svg'
+                    }}
+                    src={authStatus.branding.logoUrl}
+                />
+            ) : (
+                <Logo aria-hidden color="var(--accent)" size="2.5rem" />
+            )}
+        </Link>
     )
 }

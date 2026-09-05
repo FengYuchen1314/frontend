@@ -1,15 +1,13 @@
 /* eslint-disable @stylistic/indent */
-import { Box, BoxProps, ElementProps } from '@mantine/core'
+import type { SVGProps } from 'react'
 
-interface LogoProps
-    extends ElementProps<'svg', keyof BoxProps>, Omit<BoxProps, 'children' | 'ref'> {
+interface LogoProps extends Omit<SVGProps<SVGSVGElement>, 'children' | 'ref'> {
     size?: number | string
 }
 
 export function XrayLogo({ size = 20, style, ...props }: LogoProps) {
     return (
-        <Box
-            component="svg"
+        <svg
             fill="currentColor"
             preserveAspectRatio="xMidYMid meet"
             style={{
@@ -40,6 +38,6 @@ export function XrayLogo({ size = 20, style, ...props }: LogoProps) {
                 d="M16.7059 28.9873V19.3784C16.7059 18.8261 16.2582 18.3784 15.7059 18.3784H3.83963C2.71522 18.3784 2.44656 19.9473 3.50691 20.3214L11.5457 23.1578C11.7987 23.247 12.0052 23.4342 12.1188 23.6772L14.8 29.4109C15.2531 30.3797 16.7059 30.0568 16.7059 28.9873Z"
                 fill="currentColor"
             />
-        </Box>
+        </svg>
     )
 }

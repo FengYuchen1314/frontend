@@ -1,109 +1,104 @@
-import type { BgStyle, MaskableField } from './recap.constants'
+import type { MaskableField } from './recap.constants'
 
-import {
-    alpha,
-    Button,
-    Center,
-    ColorPicker,
-    Group,
-    Loader,
-    Stack,
-    Switch,
-    TextInput
-} from '@mantine/core'
-import { notifications } from '@mantine/notifications'
+import { Alert, Button, Input, Label, Spinner, Switch, TextField, toast } from '@heroui/react'
 import dayjs from 'dayjs'
 import { motion } from 'motion/react'
-import { useRef, useState } from 'react'
+import { useEffect, useReducer, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { TbCheck, TbCopy, TbDownload, TbX } from 'react-icons/tb'
 
+import { getSessionGeneration, subscribeSessionChanges } from '@shared/api/axios'
 import { useGetRecap } from '@shared/api/hooks/system/system.query.hooks'
 import { Logo } from '@shared/ui/logo'
 import { prettifyBytesUtil } from '@shared/utils/bytes'
 import { copyScreenshotToClipboard, downloadScreenshot } from '@shared/utils/copy-screenshot.util'
 
-import {
-    BG_STYLES,
-    CARD_SECTIONS,
-    DEFAULT_SECTIONS,
-    MASKABLE_FIELDS,
-    SWATCHES
-} from './recap.constants'
+import { BG_STYLES, CARD_SECTIONS, MASKABLE_FIELDS, SWATCHES } from './recap.constants'
 import classes from './recap.content.module.css'
+import {
+    createRecapExporter,
+    createRecapPreferences,
+    recapBackground,
+    recapColorAlpha as alpha,
+    recapColorHex,
+    recapField,
+    recapReducer,
+    waitForRecapLayout,
+    type RecapExportKind
+} from './recap.model'
 
-export function RecapContent() {
-    const { data: recap, isLoading } = useGetRecap()
+export function RecapContent({ signal }: { signal?: AbortSignal } = {}) {
+    const { data: recap, isLoading, error, refetch, isFetching } = useGetRecap()
     const { t } = useTranslation()
 
     const [cardKey, setCardKey] = useState(0)
-    const [sections, setSections] = useState<string[]>(DEFAULT_SECTIONS)
-    const [accent, setAccent] = useState(SWATCHES[0])
-    const [copying, setCopying] = useState(false)
-    const [downloading, setDownloading] = useState(false)
-    const [maskedFields, setMaskedFields] = useState<string[]>([])
-    const [customNote, setCustomNote] = useState('')
-    const [bgStyle, setBgStyle] = useState<BgStyle>('solid')
+    const [{ sections, accent, maskedFields, customNote, bgStyle }, dispatch] = useReducer(
+        recapReducer,
+        undefined,
+        createRecapPreferences
+    )
+    const [exporting, setExporting] = useState<RecapExportKind | null>(null)
 
     const ref = useRef<HTMLDivElement>(null)
 
-    const copy = async () => {
-        setCopying(true)
-        try {
-            setCardKey((k) => k + 1)
-
-            await copyScreenshotToClipboard(
-                async () => {
-                    await new Promise<void>((resolve) => {
-                        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-                    })
-                    if (!ref.current) throw new Error('ref')
-                    return ref.current
-                },
-                `remnawave-recap-${dayjs().format('YYYY-MM-DD')}.png`
-            )
-        } catch (error) {
-            notifications.show({
-                color: 'red',
-                message: `${error instanceof Error ? error.message : 'Unknown error'}`,
-                title: 'Error'
-            })
-        } finally {
-            setCopying(false)
+    const exporter = useRef<ReturnType<typeof createRecapExporter> | null>(null)
+    useEffect(() => {
+        const session = getSessionGeneration()
+        const filename = () => `remnawave-recap-${dayjs().format('YYYY-MM-DD')}.png`
+        const controller = createRecapExporter({
+            isCurrent: () => !signal?.aborted && getSessionGeneration() === session,
+            getElement: () => ref.current,
+            prepare: waitForRecapLayout,
+            copy: (target, signal) => copyScreenshotToClipboard(target, filename(), signal),
+            download: (element, signal) => downloadScreenshot(element, filename(), signal),
+            onState: (kind) => {
+                setExporting(kind)
+                if (kind) setCardKey((key) => key + 1)
+            },
+            onError: (error) =>
+                toast.danger('Recap export failed', {
+                    description: error instanceof Error ? error.message : 'Could not export Recap'
+                })
+        })
+        exporter.current = controller
+        const abort = () => controller.dispose()
+        signal?.addEventListener('abort', abort, { once: true })
+        const unsubscribe = subscribeSessionChanges(() => controller.dispose())
+        return () => {
+            signal?.removeEventListener('abort', abort)
+            unsubscribe()
+            controller.dispose()
+            exporter.current = null
         }
-    }
+    }, [signal])
 
-    const download = async () => {
-        setDownloading(true)
-        try {
-            setCardKey((k) => k + 1)
-            await new Promise<void>((resolve) => {
-                requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-            })
-
-            if (!ref.current) throw new Error('ref')
-            await downloadScreenshot(
-                ref.current,
-                `remnawave-recap-${dayjs().format('YYYY-MM-DD')}.png`
-            )
-        } catch {
-            notifications.show({
-                color: 'red',
-                message: 'Could not download Recap',
-                title: 'Error'
-            })
-        } finally {
-            setDownloading(false)
-        }
-    }
-
-    if (isLoading || !recap) {
+    if (isLoading) {
         return (
-            <Center h={600}>
-                <Loader color="cyan" size="sm" />
-            </Center>
+            <div className="flex min-h-72 items-center justify-center">
+                <Spinner aria-label="Loading Recap" size="lg" />
+            </div>
         )
     }
+    if (!recap)
+        return (
+            <Alert role="alert" status="danger">
+                <Alert.Indicator />
+                <Alert.Content>
+                    <Alert.Title>Recap unavailable</Alert.Title>
+                    <Alert.Description>
+                        {error?.message ?? 'No Recap data was returned.'}
+                    </Alert.Description>
+                    <Button
+                        isDisabled={isFetching}
+                        onPress={() => void refetch()}
+                        size="sm"
+                        variant="secondary"
+                    >
+                        {t('common.action.refresh')}
+                    </Button>
+                </Alert.Content>
+            </Alert>
+        )
 
     const gradientLine = {
         background: `linear-gradient(90deg, transparent, ${alpha(accent, 0.3)}, transparent)`
@@ -115,97 +110,71 @@ export function RecapContent() {
         }).format(value)
     }
 
-    const getBgOverlay = (): null | React.CSSProperties => {
-        switch (bgStyle) {
-            case 'dots':
-                return {
-                    backgroundImage: `radial-gradient(${alpha(accent, 0.12)} 1px, transparent 1px)`,
-                    backgroundSize: '16px 16px'
-                }
-            case 'gradient':
-                return {
-                    background: `linear-gradient(135deg, transparent 0%, ${alpha(accent, 0.08)} 50%, transparent 100%)`
-                }
-            case 'grid':
-                return {
-                    backgroundImage: `linear-gradient(${alpha(accent, 0.06)} 1px, transparent 1px), linear-gradient(90deg, ${alpha(accent, 0.06)} 1px, transparent 1px)`,
-                    backgroundSize: '24px 24px'
-                }
-            default:
-                return null
-        }
-    }
-
-    const bgOverlay = getBgOverlay()
-
-    const MASK = '\u{1F648}'
+    const bgOverlay = recapBackground(bgStyle, accent)
     const m = (field: MaskableField, value: number | string | undefined) =>
-        maskedFields.includes(field) ? MASK : value
+        recapField(maskedFields, field, value)
 
     return (
-        <Group align="center" gap="sm" justify="center" wrap="nowrap">
+        <div className="flex flex-wrap items-center justify-center gap-4">
             <motion.div
                 animate={{ opacity: 1, scale: 1 }}
                 initial={{ opacity: 0, scale: 1 }}
                 transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
             >
-                <Stack gap="sm" style={{ flexShrink: 0, width: 270 }}>
+                <div className="flex w-[270px] shrink-0 flex-col gap-3">
                     <div className={classes.controlPanel}>
                         <div className={classes.controlLabel}>Sections</div>
-                        <Stack gap="xs">
+                        <div className="flex flex-col gap-2">
                             {CARD_SECTIONS.map((s) => (
                                 <Switch
-                                    checked={sections.includes(s.value)}
+                                    isSelected={sections.includes(s.value)}
                                     key={s.value}
-                                    label={s.label}
-                                    onChange={(e) => {
-                                        const { checked } = e.currentTarget
-                                        setSections((prev) =>
-                                            checked
-                                                ? [...prev, s.value]
-                                                : prev.filter((v) => v !== s.value)
-                                        )
-                                    }}
+                                    onChange={(selected) =>
+                                        dispatch({ type: 'section', value: s.value, selected })
+                                    }
                                     size="sm"
-                                />
+                                >
+                                    <Switch.Content>
+                                        <Switch.Control>
+                                            <Switch.Thumb />
+                                        </Switch.Control>
+                                    </Switch.Content>
+                                    <Label>{s.label}</Label>
+                                </Switch>
                             ))}
-                        </Stack>
+                        </div>
                     </div>
 
                     <div className={classes.controlPanel}>
                         <div className={classes.controlLabel}>Mask fields</div>
-                        <Group gap={4}>
+                        <div className="flex flex-wrap gap-1">
                             {MASKABLE_FIELDS.map((f) => {
                                 const active = maskedFields.includes(f.value)
                                 return (
                                     <Button
-                                        color={!active ? 'teal' : 'gray'}
+                                        aria-pressed={active}
                                         key={f.value}
-                                        leftSection={
-                                            !active ? <TbCheck size={16} /> : <TbX size={16} />
-                                        }
-                                        onClick={() =>
-                                            setMaskedFields((prev) =>
-                                                active
-                                                    ? prev.filter((v) => v !== f.value)
-                                                    : [...prev, f.value]
-                                            )
-                                        }
-                                        radius="md"
-                                        size="compact-sm"
-                                        variant="soft"
+                                        onPress={() => dispatch({ type: 'mask', value: f.value })}
+                                        size="sm"
+                                        variant={!active ? 'secondary' : 'tertiary'}
                                     >
+                                        {!active ? (
+                                            <TbCheck aria-hidden size={16} />
+                                        ) : (
+                                            <TbX aria-hidden size={16} />
+                                        )}
                                         {f.label}
                                     </Button>
                                 )
                             })}
-                        </Group>
+                        </div>
                     </div>
-                </Stack>
+                </div>
             </motion.div>
 
             <motion.div
                 animate={{ opacity: 1, scale: 1 }}
+                className="w-full max-w-[380px]"
                 initial={{ opacity: 0, scale: 1 }}
                 transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
             >
@@ -361,76 +330,93 @@ export function RecapContent() {
                 initial={{ opacity: 0, scale: 1 }}
                 transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
             >
-                <Stack gap="sm" style={{ flexShrink: 0, width: 270 }}>
+                <div className="flex w-[270px] shrink-0 flex-col gap-3">
                     <div className={classes.controlPanel}>
                         <div className={classes.controlLabel}>Background</div>
-                        <Group gap={4}>
+                        <div className="flex flex-wrap gap-1">
                             {BG_STYLES.map((s) => (
                                 <Button
-                                    color={bgStyle === s.value ? 'teal' : 'gray'}
+                                    aria-pressed={bgStyle === s.value}
                                     key={s.value}
-                                    onClick={() => setBgStyle(s.value)}
-                                    radius="md"
-                                    size="compact-sm"
-                                    variant="soft"
+                                    onPress={() => dispatch({ type: 'background', value: s.value })}
+                                    size="sm"
+                                    variant={bgStyle === s.value ? 'secondary' : 'tertiary'}
                                 >
                                     {s.label}
                                 </Button>
                             ))}
-                        </Group>
+                        </div>
                     </div>
 
                     <div className={classes.controlPanel}>
                         <div className={classes.controlLabel}>Custom note</div>
-                        <TextInput
-                            maxLength={40}
-                            onChange={(e) => setCustomNote(e.currentTarget.value)}
-                            placeholder="RW <3"
-                            size="xs"
+                        <TextField
+                            aria-label="Custom note"
+                            onChange={(value) => dispatch({ type: 'note', value })}
                             value={customNote}
-                        />
+                        >
+                            <Input maxLength={40} placeholder="RW <3" />
+                        </TextField>
                     </div>
 
                     <div className={classes.controlPanel}>
                         <div className={classes.controlLabel}>Accent color</div>
-                        <ColorPicker
-                            format="rgb"
-                            onChange={setAccent}
-                            size="md"
-                            swatches={SWATCHES}
-                            swatchesPerRow={8}
-                            value={accent}
-                            withPicker
+                        <input
+                            aria-label="Accent color"
+                            className="h-10 w-full cursor-pointer rounded-lg"
+                            onChange={(event) =>
+                                dispatch({ type: 'accent', value: event.currentTarget.value })
+                            }
+                            type="color"
+                            value={recapColorHex(accent)}
                         />
+                        <div className="mt-2 grid grid-cols-8 gap-1">
+                            {SWATCHES.map((color) => (
+                                <Button
+                                    aria-label={`Accent ${color}`}
+                                    aria-pressed={recapColorHex(accent) === recapColorHex(color)}
+                                    className="size-6 min-w-0 rounded-full p-0"
+                                    isIconOnly
+                                    key={color}
+                                    onPress={() => dispatch({ type: 'accent', value: color })}
+                                    style={{ background: color }}
+                                />
+                            ))}
+                        </div>
                     </div>
 
-                    <Group gap="xs">
+                    <div className="flex flex-wrap gap-2">
                         <Button
-                            color={accent}
                             fullWidth
-                            leftSection={<TbCopy size={14} />}
-                            loading={copying}
-                            onClick={copy}
-                            radius="md"
+                            isDisabled={exporting !== null}
+                            onPress={() => void exporter.current?.run('copy')}
                             size="sm"
-                            variant="filled"
+                            variant="primary"
                         >
+                            {exporting === 'copy' ? (
+                                <Spinner aria-hidden size="sm" />
+                            ) : (
+                                <TbCopy aria-hidden size={14} />
+                            )}
                             {t('common.action.copy')}
                         </Button>
                         <Button
                             fullWidth
-                            leftSection={<TbDownload size={14} />}
-                            loading={downloading}
-                            onClick={download}
-                            radius="md"
+                            isDisabled={exporting !== null}
+                            onPress={() => void exporter.current?.run('download')}
                             size="sm"
-                            variant="default"
+                            variant="secondary"
                         >
+                            {exporting === 'download' ? (
+                                <Spinner aria-hidden size="sm" />
+                            ) : (
+                                <TbDownload aria-hidden size={14} />
+                            )}
                             {t('common.action.download')}
                         </Button>
-                    </Group>
-                </Stack>
+                    </div>
+                </div>
             </motion.div>
-        </Group>
+        </div>
     )
 }

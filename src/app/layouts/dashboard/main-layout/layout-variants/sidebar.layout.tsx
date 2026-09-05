@@ -1,24 +1,15 @@
-import { useDisclosure } from '@mantine/hooks'
+import { useState, type ReactNode } from 'react'
 
 import { SidebarShellLayout } from './sidebar-shell.layout'
 
-interface IProps {
-    headerControls: React.ReactNode
-}
-
-export const SidebarLayout = (props: IProps) => {
-    const { headerControls } = props
-
-    const [opened, { toggle }] = useDisclosure(true)
-
+export const SidebarLayout = ({ headerControls }: { headerControls: ReactNode }) => {
+    const [opened, setOpened] = useState(true)
     return (
         <SidebarShellLayout
-            closedSide="desktop"
+            mode="desktop"
             headerControls={headerControls}
             opened={opened}
-            padding="xl"
-            toggle={toggle}
-            withFadeIn
+            onOpenChange={setOpened}
         />
     )
 }

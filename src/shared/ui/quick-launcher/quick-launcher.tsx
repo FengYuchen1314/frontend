@@ -1,17 +1,16 @@
-import type { ILauncherPosition, IQuickLauncherRoute, TQuickLink } from './quick-links.types'
-import type { SetFloatingWindowPosition } from '@mantine/hooks'
+import type { ILauncherPosition, IQuickLauncherRoute } from './quick-links.types'
+import type { CSSProperties, PointerEvent } from 'react'
 
-import { ActionIcon, FloatingWindow } from '@mantine/core'
+import { Button } from '@heroui/react'
 import {
-    CSSProperties,
-    ComponentType,
     useCallback,
     useEffect,
     useLayoutEffect,
-    useMemo,
     useRef,
-    useState
+    useState,
+    useSyncExternalStore
 } from 'react'
+import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { TbArrowsMove, TbGripHorizontal, TbPlus, TbSettings } from 'react-icons/tb'
 import { useNavigate } from 'react-router'
@@ -28,364 +27,385 @@ import {
     useViewPreferencesStoreActions
 } from '@entities/dashboard/view-preferences-store'
 
+import {
+    clampLauncherPosition,
+    createLauncherGesture,
+    isLauncherLinkAvailable,
+    launcherColumns,
+    LAUNCHER_CELL_SIZE,
+    LAUNCHER_HEADER_HEIGHT,
+    LAUNCHER_HOLD_DELAY,
+    LAUNCHER_OFFSET,
+    observeLauncherPointerEnd,
+    quickLinkKey,
+    resizeLauncherColumns,
+    runLauncherLink
+} from './quick-launcher.model'
 import { QUICK_ICONS, QUICK_MODALS } from './quick-links.catalog'
-import { isSafeExternalUrl, MAX_QUICK_COLUMNS } from './quick-links.types'
+import { MAX_QUICK_COLUMNS } from './quick-links.types'
 import classes from './QuickLauncher.module.css'
-
-const OFFSET = 5
-const AUTO_COLUMNS = 3
-const CELL_SIZE = 58
-const HEADER_HEIGHT = 29
-const HOLD_DELAY = 320
-const HOLD_TOLERANCE = 6
 
 interface IProps {
     routes: IQuickLauncherRoute[]
 }
 
-interface IResolvedLink {
-    Icon: ComponentType<{ size?: number }>
-    key: string
-    label: string
-    run: () => void
+const subscribeViewport = (notify: () => void) => {
+    window.addEventListener('resize', notify)
+    return () => window.removeEventListener('resize', notify)
 }
+const viewportSnapshot = () => `${window.innerWidth}:${window.innerHeight}`
+const serverViewport = () => '1024:768'
 
 export const QuickLauncher = ({ routes }: IProps) => {
+    const enabled = useExperimentalFeature('quickLauncher')
+    return enabled ? <QuickLauncherWindow routes={routes} /> : null
+}
+
+export const QuickLauncherWindow = ({ routes }: IProps) => {
     const { t } = useTranslation()
     const navigate = useNavigate()
-
-    const isEnabled = useExperimentalFeature('quickLauncher')
     const experimental = useExperimentalFeatures()
-
     const storedPosition = useLauncherPosition()
     const storedColumns = useLauncherColumns()
     const links = useQuickLinks()
     const { setLauncherColumns, setLauncherPosition } = useViewPreferencesStoreActions()
-
-    const positionRef = useRef<ILauncherPosition | null>(null)
-    const nodeRef = useRef<HTMLDivElement | null>(null)
-    const setPositionRef = useRef<null | SetFloatingWindowPosition>(null)
-    const pendingShiftRef = useRef(0)
-    const grabRef = useRef<null | {
-        offsetX: number
-        offsetY: number
-        pointerId: number
-        startX: number
-        startY: number
-    }>(null)
-    const holdTimerRef = useRef<null | number>(null)
-    const suppressClickRef = useRef(false)
-
+    const [viewportWidth, viewportHeight] = useSyncExternalStore(
+        subscribeViewport,
+        viewportSnapshot,
+        serverViewport
+    )
+        .split(':')
+        .map(Number)
+    const [gesture] = useState(createLauncherGesture)
     const [isHeaderVisible, setIsHeaderVisible] = useState(false)
     const [isGrabbing, setIsGrabbing] = useState(false)
-
-    const cancelHold = () => {
-        if (holdTimerRef.current === null) return
-
-        window.clearTimeout(holdTimerRef.current)
-        holdTimerRef.current = null
-    }
-
-    const toggleHeader = (isPinned: boolean) => {
-        pendingShiftRef.current = isPinned ? 0 : isHeaderVisible ? HEADER_HEIGHT : -HEADER_HEIGHT
-        setIsHeaderVisible(!isHeaderVisible)
-    }
-
-    useLayoutEffect(() => {
-        const shift = pendingShiftRef.current
-        const node = nodeRef.current
-
-        pendingShiftRef.current = 0
-
-        if (!shift || !node) return
-
-        const rect = node.getBoundingClientRect()
-
-        setPositionRef.current?.({ left: rect.left, top: rect.top + shift })
-    }, [isHeaderVisible])
-
-    const registerShard = useCallback((node: HTMLDivElement | null) => {
-        nodeRef.current = node
-
-        return node ? registerScrollLockShard(node) : undefined
-    }, [])
-
-    const commitPosition = () => {
-        if (positionRef.current) setLauncherPosition(positionRef.current)
-    }
-
-    const openEditor = () => showModal('quickLinksModal', { routes })
-
-    const handleResizeMove = (event: React.PointerEvent<HTMLDivElement>) => {
-        const node = nodeRef.current
-        if (!node || !event.currentTarget.hasPointerCapture(event.pointerId)) return
-
-        const { left } = node.getBoundingClientRect()
-        const room = Math.max(Math.floor((window.innerWidth - left) / CELL_SIZE), 1)
-        const next = Math.min(
-            Math.max(Math.round((event.clientX - left) / CELL_SIZE), 1),
-            Math.min(MAX_QUICK_COLUMNS, room)
-        )
-
-        if (next !== preferredColumns) setLauncherColumns(next)
-    }
-
-    const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-        if (event.button !== 0) return
-
-        const node = nodeRef.current
-        if (!node) return
-        if (event.target instanceof Element && event.target.closest(`.${classes.header}`)) return
-
-        const rect = node.getBoundingClientRect()
-
-        grabRef.current = {
-            offsetX: event.clientX - rect.left,
-            offsetY: event.clientY - rect.top,
-            pointerId: event.pointerId,
-            startX: event.clientX,
-            startY: event.clientY
-        }
-
-        holdTimerRef.current = window.setTimeout(() => {
-            holdTimerRef.current = null
-
-            node.setPointerCapture(event.pointerId)
-            setIsGrabbing(true)
-        }, HOLD_DELAY)
-    }
-
-    const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-        const grab = grabRef.current
-        const node = nodeRef.current
-        if (!grab || !node || grab.pointerId !== event.pointerId) return
-
-        if (holdTimerRef.current !== null) {
-            const moved = Math.hypot(event.clientX - grab.startX, event.clientY - grab.startY)
-            if (moved > HOLD_TOLERANCE) cancelHold()
-
-            return
-        }
-
-        if (!isGrabbing) return
-
-        const rect = node.getBoundingClientRect()
-        const left = Math.min(
-            Math.max(event.clientX - grab.offsetX, 0),
-            window.innerWidth - rect.width
-        )
-        const top = Math.min(
-            Math.max(event.clientY - grab.offsetY, 0),
-            window.innerHeight - rect.height
-        )
-
-        node.style.left = `${left}px`
-        node.style.top = `${top}px`
-    }
-
-    const releaseGrab = () => {
-        cancelHold()
-        grabRef.current = null
-        setIsGrabbing(false)
-    }
-
-    useEffect(() => cancelHold, [])
-
-    useEffect(() => {
-        const handleViewportResize = () => {
-            const node = nodeRef.current
-            if (!node) return
-
-            const rect = node.getBoundingClientRect()
-
-            setPositionRef.current?.({ left: rect.left, top: rect.top })
-        }
-
-        window.addEventListener('resize', handleViewportResize)
-
-        return () => window.removeEventListener('resize', handleViewportResize)
-    }, [])
-
-    const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
-        const grab = grabRef.current
-        const node = nodeRef.current
-        if (!grab || grab.pointerId !== event.pointerId) return
-
-        cancelHold()
-        grabRef.current = null
-
-        if (!isGrabbing || !node) return
-
-        node.releasePointerCapture(event.pointerId)
-        setIsGrabbing(false)
-        suppressClickRef.current = true
-        window.setTimeout(() => {
-            suppressClickRef.current = false
-        }, 0)
-
-        const rect = node.getBoundingClientRect()
-
-        setPositionRef.current?.({ left: rect.left, top: rect.top })
-        setLauncherPosition({ x: rect.left, y: rect.top })
-    }
-
-    const routeCatalog = useMemo(
-        () => new Map(routes.map((route) => [route.href, route])),
-        [routes]
+    const nodeRef = useRef<HTMLElement | null>(null)
+    const positionRef = useRef<ILauncherPosition | null>(null)
+    const lastStoredPosition = useRef(storedPosition)
+    const pendingShift = useRef(0)
+    const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+    const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+    const resolved = links.filter((link) =>
+        isLauncherLinkAvailable(link, routes, experimental, QUICK_MODALS)
     )
-
-    const resolved = useMemo<IResolvedLink[]>(() => {
-        const out: IResolvedLink[] = []
-
-        links.forEach((link: TQuickLink, index) => {
-            if (link.kind === 'modal') {
-                const entry = QUICK_MODALS[link.id]
-                if (entry.experimental && !experimental[entry.experimental]) return
-
-                out.push({
-                    Icon: entry.Icon,
-                    key: `modal-${link.id}-${index}`,
-                    label: t(entry.labelKey),
-                    run: entry.open
-                })
-
-                return
-            }
-
-            if (link.kind === 'route') {
-                const entry = routeCatalog.get(link.path)
-                if (!entry) return
-
-                out.push({
-                    Icon: entry.icon,
-                    key: `route-${index}-${link.path}`,
-                    label: entry.name,
-                    run: () => navigate(link.path)
-                })
-
-                return
-            }
-
-            if (!isSafeExternalUrl(link.url)) return
-
-            out.push({
-                Icon: QUICK_ICONS[link.icon],
-                key: `external-${index}-${link.url}`,
-                label: link.label,
-                run: () => window.open(link.url, '_blank', 'noopener,noreferrer')
-            })
-        })
-
-        return out
-    }, [links, experimental, routeCatalog, navigate, t])
-
-    if (!isEnabled) return null
-
-    const preferredColumns = storedColumns
-        ? Math.min(Math.max(storedColumns, 1), MAX_QUICK_COLUMNS)
-        : AUTO_COLUMNS
-    const columns = Math.min(preferredColumns, Math.max(resolved.length, 1))
+    const columns = launcherColumns(storedColumns, resolved.length, viewportWidth)
     const showHeader = isHeaderVisible || resolved.length === 0
 
-    return (
-        <FloatingWindow
-            className={classes.window}
-            constrainOffset={0}
-            constrainToViewport
-            dragHandleSelector={`.${classes.header}`}
-            excludeDragHandleSelector="button"
-            initialPosition={
-                storedPosition
-                    ? { left: storedPosition.x, top: storedPosition.y }
-                    : { bottom: OFFSET, left: OFFSET }
+    const registerShard = useCallback((node: HTMLElement | null) => {
+        nodeRef.current = node
+        return node ? registerScrollLockShard(node) : undefined
+    }, [])
+    const place = useCallback((position: ILauncherPosition) => {
+        const node = nodeRef.current
+        if (!node) return
+        const next = clampLauncherPosition(position, node.getBoundingClientRect(), {
+            width: window.innerWidth,
+            height: window.innerHeight
+        })
+        node.style.left = `${next.x}px`
+        node.style.top = `${next.y}px`
+        node.style.bottom = 'auto'
+        positionRef.current = next
+    }, [])
+    useLayoutEffect(() => {
+        const node = nodeRef.current
+        if (!node) return
+        const changed = lastStoredPosition.current !== storedPosition
+        lastStoredPosition.current = storedPosition
+        const position = (changed ? storedPosition : positionRef.current) ??
+            storedPosition ?? {
+                x: LAUNCHER_OFFSET,
+                y: viewportHeight - node.getBoundingClientRect().height - LAUNCHER_OFFSET
             }
+        place({ x: position.x, y: position.y + pendingShift.current })
+        pendingShift.current = 0
+    }, [storedPosition, columns, showHeader, viewportWidth, viewportHeight, place])
+    useEffect(() => {
+        const node = nodeRef.current
+        if (!node) return
+        const observer = new ResizeObserver(() => {
+            if (positionRef.current) place(positionRef.current)
+        })
+        observer.observe(node)
+        return () => observer.disconnect()
+    }, [place])
+    useEffect(() => {
+        const stopObserving = observeLauncherPointerEnd(window, gesture, () => {
+            if (holdTimer.current !== null) clearTimeout(holdTimer.current)
+            holdTimer.current = null
+            setIsGrabbing(false)
+        })
+        return () => {
+            stopObserving()
+            if (holdTimer.current !== null) clearTimeout(holdTimer.current)
+            if (clickTimer.current !== null) clearTimeout(clickTimer.current)
+            gesture.cancel()
+        }
+    }, [gesture])
+
+    const cancelHold = () => {
+        if (holdTimer.current !== null) clearTimeout(holdTimer.current)
+        holdTimer.current = null
+    }
+    const toggleHeader = () => {
+        pendingShift.current =
+            resolved.length === 0
+                ? 0
+                : isHeaderVisible
+                  ? LAUNCHER_HEADER_HEIGHT
+                  : -LAUNCHER_HEADER_HEIGHT
+        setIsHeaderVisible(!isHeaderVisible)
+    }
+    const openEditor = () => {
+        void showModal('quickLinksModal', { routes })
+    }
+    const cancelPointer = (event: PointerEvent<HTMLElement>) => {
+        // Normal release fires lostpointercapture after finish; keep its click suppression.
+        if (!gesture.hasPointer(event.pointerId)) return
+        cancelHold()
+        gesture.cancel()
+        setIsGrabbing(false)
+    }
+    const pointerDown = (event: PointerEvent<HTMLElement>) => {
+        if (
+            event.button !== 0 ||
+            !(event.target instanceof Element) ||
+            event.target.closest('[data-launcher-settings], [data-launcher-resizer]')
+        )
+            return
+        const node = event.currentTarget
+        const rect = node.getBoundingClientRect()
+        const immediate = Boolean(event.target.closest('[data-launcher-handle]'))
+        if (
+            !gesture.begin(
+                event.pointerId,
+                event.clientX,
+                event.clientY,
+                { x: rect.left, y: rect.top },
+                immediate
+            )
+        )
+            return
+        if (clickTimer.current !== null) clearTimeout(clickTimer.current)
+        if (immediate) {
+            node.setPointerCapture(event.pointerId)
+            setIsGrabbing(true)
+        } else {
+            holdTimer.current = setTimeout(() => {
+                holdTimer.current = null
+                if (!gesture.activate(event.pointerId)) return
+                node.setPointerCapture(event.pointerId)
+                setIsGrabbing(true)
+            }, LAUNCHER_HOLD_DELAY)
+        }
+    }
+    const pointerUp = (event: PointerEvent<HTMLElement>) => {
+        if (!gesture.hasPointer(event.pointerId)) return
+        cancelHold()
+        const dragged = gesture.finish(event.pointerId)
+        if (event.currentTarget.hasPointerCapture(event.pointerId))
+            event.currentTarget.releasePointerCapture(event.pointerId)
+        setIsGrabbing(false)
+        if (dragged) {
+            if (positionRef.current) setLauncherPosition(positionRef.current)
+            clickTimer.current = setTimeout(() => gesture.clearSuppressedClick(), 0)
+        }
+    }
+    const usedKeys = new Map<string, number>()
+    const content = (
+        <section
+            aria-label={t('constants.quick-launcher')}
+            className={classes.window}
             onContextMenu={(event) => {
                 event.preventDefault()
-                toggleHeader(resolved.length === 0)
+                toggleHeader()
             }}
-            onDragEnd={commitPosition}
-            onLostPointerCapture={releaseGrab}
-            onPointerCancel={releaseGrab}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPositionChange={(next) => {
-                positionRef.current = next
+            onKeyDown={(event) => {
+                if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+                    event.preventDefault()
+                    toggleHeader()
+                }
             }}
-            radius={14}
+            onLostPointerCapture={cancelPointer}
+            onPointerCancel={cancelPointer}
+            onPointerDown={pointerDown}
+            onPointerMove={(event) => {
+                const position = gesture.move(
+                    event.pointerId,
+                    event.clientX,
+                    event.clientY,
+                    event.currentTarget.getBoundingClientRect(),
+                    { width: window.innerWidth, height: window.innerHeight }
+                )
+                if (position) place(position)
+            }}
+            onPointerUp={pointerUp}
             ref={registerShard}
-            setPositionRef={setPositionRef}
             style={
                 {
-                    '--cell': `${CELL_SIZE}px`,
+                    '--cell': `${LAUNCHER_CELL_SIZE}px`,
                     '--columns': columns,
-                    '--header-height': `${HEADER_HEIGHT}px`
+                    '--header-height': `${LAUNCHER_HEADER_HEIGHT}px`,
+                    left: storedPosition?.x ?? LAUNCHER_OFFSET,
+                    top: storedPosition?.y,
+                    bottom: storedPosition ? undefined : LAUNCHER_OFFSET
                 } as CSSProperties
             }
-            zIndex={460}
-            withinPortal
         >
             {isGrabbing && (
                 <div className={classes.grabOverlay}>
                     <TbArrowsMove size={22} />
                 </div>
             )}
-
             {showHeader && (
-                <div
-                    className={classes.resizer}
-                    onPointerDown={(event) => {
-                        event.currentTarget.setPointerCapture(event.pointerId)
-                        event.stopPropagation()
-                    }}
-                    onPointerMove={handleResizeMove}
-                    onPointerUp={(event) =>
-                        event.currentTarget.releasePointerCapture(event.pointerId)
-                    }
-                />
+                <>
+                    <div className={classes.header}>
+                        <Button
+                            aria-label="Move quick launcher (arrow keys)"
+                            className={classes.handle}
+                            data-launcher-handle
+                            isIconOnly
+                            onKeyDown={(event) => {
+                                const directions: Record<string, [number, number]> = {
+                                    ArrowLeft: [-1, 0],
+                                    ArrowRight: [1, 0],
+                                    ArrowUp: [0, -1],
+                                    ArrowDown: [0, 1]
+                                }
+                                const direction = directions[event.key]
+                                if (!direction || !positionRef.current) return
+                                event.preventDefault()
+                                const step = event.shiftKey ? 5 : 20
+                                place({
+                                    x: positionRef.current.x + direction[0] * step,
+                                    y: positionRef.current.y + direction[1] * step
+                                })
+                                if (positionRef.current) setLauncherPosition(positionRef.current)
+                            }}
+                            variant="ghost"
+                        >
+                            <TbGripHorizontal size={16} />
+                        </Button>
+                        <Button
+                            aria-label={t('constants.quick-launcher')}
+                            className={classes.settings}
+                            data-launcher-settings
+                            isIconOnly
+                            onPress={openEditor}
+                            variant="ghost"
+                        >
+                            <TbSettings size={13} />
+                        </Button>
+                    </div>
+                    <div
+                        aria-label="Quick launcher columns"
+                        aria-valuemax={MAX_QUICK_COLUMNS}
+                        aria-valuemin={1}
+                        aria-valuenow={columns}
+                        className={classes.resizer}
+                        data-launcher-resizer
+                        role="slider"
+                        tabIndex={0}
+                        onKeyDown={(event) => {
+                            if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+                            event.preventDefault()
+                            setLauncherColumns(
+                                Math.min(
+                                    MAX_QUICK_COLUMNS,
+                                    Math.max(1, columns + (event.key === 'ArrowRight' ? 1 : -1))
+                                )
+                            )
+                        }}
+                        onPointerDown={(event) => {
+                            event.stopPropagation()
+                            if (event.button === 0)
+                                event.currentTarget.setPointerCapture(event.pointerId)
+                        }}
+                        onPointerMove={(event) => {
+                            event.stopPropagation()
+                            if (
+                                !event.currentTarget.hasPointerCapture(event.pointerId) ||
+                                !nodeRef.current
+                            )
+                                return
+                            setLauncherColumns(
+                                resizeLauncherColumns(
+                                    event.clientX,
+                                    nodeRef.current.getBoundingClientRect().left,
+                                    window.innerWidth
+                                )
+                            )
+                        }}
+                        onPointerUp={(event) => {
+                            event.stopPropagation()
+                            if (event.currentTarget.hasPointerCapture(event.pointerId))
+                                event.currentTarget.releasePointerCapture(event.pointerId)
+                        }}
+                    />
+                </>
             )}
-
-            {showHeader && (
-                <div className={classes.header}>
-                    <TbGripHorizontal size={16} />
-
-                    <ActionIcon
-                        className={classes.settings}
-                        color="gray"
-                        onClick={openEditor}
-                        size="xs"
-                        variant="subtle"
-                    >
-                        <TbSettings size={13} />
-                    </ActionIcon>
-                </div>
-            )}
-
             {resolved.length === 0 ? (
-                <button className={classes.empty} onClick={openEditor} type="button">
+                <Button
+                    aria-label={t('common.action.add')}
+                    className={classes.empty}
+                    isIconOnly
+                    onPress={() => {
+                        if (!gesture.shouldSuppressClick()) openEditor()
+                    }}
+                    variant="ghost"
+                >
                     <TbPlus size={20} />
-                </button>
+                </Button>
             ) : (
                 <div className={classes.grid}>
-                    {resolved.map((item) => (
-                        <button
-                            className={classes.item}
-                            key={item.key}
-                            onClick={() => {
-                                if (suppressClickRef.current) {
-                                    suppressClickRef.current = false
-                                    return
-                                }
-
-                                item.run()
-                            }}
-                            type="button"
-                        >
-                            <item.Icon size={20} />
-                        </button>
-                    ))}
+                    {resolved.map((link) => {
+                        const identity = quickLinkKey(link)
+                        const occurrence = usedKeys.get(identity) ?? 0
+                        usedKeys.set(identity, occurrence + 1)
+                        const route =
+                            link.kind === 'route'
+                                ? routes.find((item) => item.href === link.path)
+                                : undefined
+                        const Icon =
+                            link.kind === 'modal'
+                                ? QUICK_MODALS[link.id].Icon
+                                : link.kind === 'external'
+                                  ? QUICK_ICONS[link.icon]
+                                  : route!.icon
+                        const label =
+                            link.kind === 'modal'
+                                ? t(QUICK_MODALS[link.id].labelKey)
+                                : link.kind === 'external'
+                                  ? link.label
+                                  : route!.name
+                        return (
+                            <Button
+                                aria-label={label}
+                                className={classes.item}
+                                isIconOnly
+                                key={`${identity}:${occurrence}`}
+                                onPress={() => {
+                                    if (!gesture.shouldSuppressClick())
+                                        runLauncherLink(
+                                            link,
+                                            routes,
+                                            experimental,
+                                            QUICK_MODALS,
+                                            navigate,
+                                            (url, target, features) => {
+                                                window.open(url, target, features)
+                                            }
+                                        )
+                                }}
+                                variant="ghost"
+                            >
+                                <Icon size={20} />
+                            </Button>
+                        )
+                    })}
                 </div>
             )}
-        </FloatingWindow>
+        </section>
     )
+    return typeof document === 'undefined' ? content : createPortal(content, document.body)
 }

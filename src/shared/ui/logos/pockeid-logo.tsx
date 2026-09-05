@@ -1,15 +1,13 @@
 /* eslint-disable @stylistic/indent */
-import { Box, BoxProps, ElementProps } from '@mantine/core'
+import type { SVGProps } from 'react'
 
-interface LogoProps
-    extends ElementProps<'svg', keyof BoxProps>, Omit<BoxProps, 'children' | 'ref'> {
+interface LogoProps extends Omit<SVGProps<SVGSVGElement>, 'children' | 'ref'> {
     size?: number | string
 }
 
 export function PocketidLogo({ size = 20, style, ...props }: LogoProps) {
     return (
-        <Box
-            component="svg"
+        <svg
             fill="currentColor"
             preserveAspectRatio="xMidYMid meet"
             style={{
@@ -28,6 +26,6 @@ export function PocketidLogo({ size = 20, style, ...props }: LogoProps) {
                 d="M506.6,0c209.52,0,379.98,170.45,379.98,379.96,0,82.33-25.9,160.68-74.91,226.54-48.04,64.59-113.78,111.51-190.13,135.71l-21.1,6.7-50.29-248.04,13.91-6.73c45.41-21.95,74.76-68.71,74.76-119.11,0-72.91-59.31-132.23-132.21-132.23s-132.23,59.32-132.23,132.23c0,50.4,29.36,97.16,74.77,119.11l13.65,6.61-81.01,499.24h-226.36V0h351.18Z"
                 fill="currentColor"
             />
-        </Box>
+        </svg>
     )
 }

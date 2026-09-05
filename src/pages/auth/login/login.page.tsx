@@ -18,7 +18,7 @@ export const LoginPage = () => {
     const titleParts = useMemo(
         () =>
             brandingTitle
-                ? parseColoredTextUtil(brandingTitle)
+                ? parseColoredTextUtil(brandingTitle, 'var(--foreground)')
                 : [
                       { text: 'Remna', color: 'var(--accent)' },
                       { text: 'wave', color: 'var(--foreground)' }

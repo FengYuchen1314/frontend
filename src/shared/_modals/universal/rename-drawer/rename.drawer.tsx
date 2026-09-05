@@ -1,203 +1,113 @@
 import NiceModal, { useModal } from '@ebay/nice-modal-react'
-import { ActionIcon, ModalProps, TextInput } from '@mantine/core'
-import { useField } from '@mantine/form'
-import {
-    UpdateConfigProfileCommand,
-    UpdateExternalSquadCommand,
-    UpdateInternalSquadCommand,
-    UpdateNodePluginCommand,
-    UpdatePasskeyCommand,
-    UpdateSubpageConfigCommand,
-    UpdateSubscriptionTemplateCommand
-} from '@remnawave/backend-contract'
-import { ReactNode, useId } from 'react'
+import { Button, FieldError, Form, Input, Label, Modal, Spinner, TextField } from '@heroui/react'
+import { Controller } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { TbDeviceFloppy, TbPencil } from 'react-icons/tb'
 
-import { useNiceMantineModal } from '@shared/_modals/use-nice-modal'
 import {
-    QueryKeys,
-    useUpdateConfigProfile,
-    useUpdateExternalSquad,
-    useUpdateInternalSquad,
-    useUpdateNodePlugin,
-    useUpdatePasskey,
-    useUpdateSubpageConfig,
-    useUpdateSubscriptionTemplate
-} from '@shared/api/hooks'
-import { queryClient } from '@shared/api/query-client'
-import { CompoundModalShared } from '@shared/ui/compound-modal/compound-modal.shared'
-import { BaseOverlayHeader } from '@shared/ui/overlays/base-overlay-header'
+    HeroModalPresence,
+    useHeroModal,
+    type HeroModalController
+} from '@shared/_modals/use-hero-modal'
 
-type RenameType =
-    | 'configProfile'
-    | 'externalSquad'
-    | 'internalSquad'
-    | 'nodePlugin'
-    | 'passkey'
-    | 'subpageConfig'
-    | 'template'
+import {
+    renameDefinitions,
+    type RenameDefinition,
+    type RenameKind
+} from './model/rename-definitions'
+import { useRenameForm } from './model/use-rename-form'
 
 interface IProps {
     name: string
-    renameFrom: RenameType
+    renameFrom: RenameKind
     uuid: string
 }
 
-interface IBodyProps {
-    modalProps: Omit<ModalProps, 'children' | 'title'>
+export function RenameDialogForm({
+    definition,
+    name,
+    uuid,
+    modal
+}: {
+    definition: RenameDefinition
     name: string
-    onSaved: () => void
     uuid: string
-}
-
-const validateWith =
-    (schema: {
-        safeParse: (value: unknown) => {
-            error?: { issues: { message: string }[] }
-            success: boolean
-        }
-    }) =>
-    (value: string) => {
-        const result = schema.safeParse({ name: value })
-
-        return result.success ? null : (result.error?.issues[0]?.message ?? null)
-    }
-
-function makeBody<V>(options: {
-    buildVariables: (uuid: string, name: string) => V
-    queryKey: readonly unknown[]
-    useUpdate: (args: { mutationFns: { onSuccess: () => void } }) => {
-        isPending: boolean
-        mutate: (args: { variables: V }) => void
-    }
-    validate: (value: string) => null | string
+    modal: HeroModalController
 }) {
-    const { buildVariables, queryKey, useUpdate, validate } = options
-
-    return function Body({ modalProps, name, onSaved, uuid }: IBodyProps) {
-        const { t } = useTranslation()
-        const formId = useId()
-
-        const nameField = useField<string>({
-            mode: 'controlled',
-            initialValue: '',
-            validate
-        })
-
-        const { mutate, isPending } = useUpdate({
-            mutationFns: {
-                onSuccess: () => {
-                    queryClient.refetchQueries({ queryKey })
-                    onSaved()
-                }
-            }
-        })
-
-        const handleSubmit = async () => {
-            if (await nameField.validate()) return
-
-            mutate({ variables: buildVariables(uuid, nameField.getValue()) })
-        }
-
-        return (
-            <CompoundModalShared
-                buttons={
-                    <ActionIcon
-                        color="teal"
-                        disabled={!!nameField.error || !nameField.getValue()}
-                        form={formId}
-                        loading={isPending}
-                        type="submit"
-                        size="lg"
-                        variant="soft"
+    const { t } = useTranslation()
+    const { form, isPending, submit } = useRenameForm(definition, uuid, modal)
+    return (
+        <Form onSubmit={submit} validationBehavior="aria" className="flex flex-col gap-5">
+            <Controller
+                control={form.control}
+                name="name"
+                render={({ field, fieldState }) => (
+                    <TextField
+                        name={field.name}
+                        value={field.value}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        isRequired
+                        isInvalid={fieldState.invalid}
+                        isDisabled={isPending}
                     >
-                        <TbDeviceFloppy size="20px" />
-                    </ActionIcon>
-                }
-                modalProps={modalProps}
-                title={
-                    <BaseOverlayHeader
-                        iconColor="teal"
-                        IconComponent={TbPencil}
-                        iconVariant="soft"
-                        title={t('common.action.rename')}
-                    />
-                }
-            >
-                <form
-                    id={formId}
-                    onSubmit={(event) => {
-                        event.preventDefault()
-                        handleSubmit()
-                    }}
-                >
-                    <TextInput
-                        data-autofocus
-                        key={nameField.key}
-                        placeholder={name}
-                        {...nameField.getInputProps()}
-                        required
-                    />
-                </form>
-            </CompoundModalShared>
-        )
-    }
+                        <Label>{t('common.field.name')}</Label>
+                        <Input ref={field.ref} autoFocus placeholder={name} variant="secondary" />
+                        <FieldError>{fieldState.error?.message}</FieldError>
+                    </TextField>
+                )}
+            />
+            {form.formState.errors.root?.server?.message && (
+                <p role="alert" className="text-sm text-danger">
+                    {form.formState.errors.root.server.message}
+                </p>
+            )}
+            <div className="flex flex-wrap justify-end gap-2">
+                <Button type="button" variant="secondary" onPress={modal.close}>
+                    {t('common.action.cancel')}
+                </Button>
+                <Button type="submit" isPending={isPending}>
+                    {isPending ? (
+                        <Spinner size="sm" color="current" />
+                    ) : (
+                        <TbDeviceFloppy aria-hidden="true" />
+                    )}
+                    {t('common.action.save')}
+                </Button>
+            </div>
+        </Form>
+    )
 }
 
-const BODY_BY_KIND: Record<RenameType, (props: IBodyProps) => ReactNode> = {
-    configProfile: makeBody({
-        buildVariables: (uuid, name) => ({ uuid, name }),
-        queryKey: QueryKeys.configProfiles.getConfigProfiles.queryKey,
-        useUpdate: useUpdateConfigProfile,
-        validate: validateWith(UpdateConfigProfileCommand.RequestBodySchema.omit({ uuid: true }))
-    }),
-    externalSquad: makeBody({
-        buildVariables: (uuid, name) => ({ uuid, name }),
-        queryKey: QueryKeys.externalSquads.getExternalSquads.queryKey,
-        useUpdate: useUpdateExternalSquad,
-        validate: validateWith(UpdateExternalSquadCommand.RequestBodySchema.omit({ uuid: true }))
-    }),
-    internalSquad: makeBody({
-        buildVariables: (uuid, name) => ({ uuid, name }),
-        queryKey: QueryKeys.internalSquads.getInternalSquads.queryKey,
-        useUpdate: useUpdateInternalSquad,
-        validate: validateWith(UpdateInternalSquadCommand.RequestBodySchema.omit({ uuid: true }))
-    }),
-    nodePlugin: makeBody({
-        buildVariables: (uuid, name) => ({ uuid, name }),
-        queryKey: QueryKeys.nodePlugins.getNodePlugins.queryKey,
-        useUpdate: useUpdateNodePlugin,
-        validate: validateWith(UpdateNodePluginCommand.RequestBodySchema.omit({ uuid: true }))
-    }),
-    passkey: makeBody({
-        buildVariables: (uuid, name) => ({ id: uuid, name }),
-        queryKey: QueryKeys.passkeys.getPasskeys.queryKey,
-        useUpdate: useUpdatePasskey,
-        validate: validateWith(UpdatePasskeyCommand.RequestBodySchema.omit({ id: true }))
-    }),
-    subpageConfig: makeBody({
-        buildVariables: (uuid, name) => ({ uuid, name }),
-        queryKey: QueryKeys.subpageConfigs.getSubpageConfigs.queryKey,
-        useUpdate: useUpdateSubpageConfig,
-        validate: validateWith(UpdateSubpageConfigCommand.RequestBodySchema.omit({ uuid: true }))
-    }),
-    template: makeBody({
-        buildVariables: (uuid, name) => ({ uuid, name }),
-        queryKey: QueryKeys.subscriptionTemplate.getSubscriptionTemplates.queryKey,
-        useUpdate: useUpdateSubscriptionTemplate,
-        validate: validateWith(
-            UpdateSubscriptionTemplateCommand.RequestBodySchema.omit({ uuid: true })
-        )
-    })
-}
-
-export const RenameModalShared = NiceModal.create((props: IProps) => {
-    const { name, renameFrom, uuid } = props
-    const modal = useModal()
-    const { modalProps, hide } = useNiceMantineModal({ modal })
-
-    const Body = BODY_BY_KIND[renameFrom]
-
-    return <Body modalProps={modalProps} name={name} onSaved={hide} uuid={uuid} />
+export const RenameModalShared = NiceModal.create(({ name, renameFrom, uuid }: IProps) => {
+    const niceModal = useModal()
+    const modal = useHeroModal({ modal: niceModal, scopeKey: renameFrom + ':' + uuid })
+    const { t } = useTranslation()
+    return (
+        <Modal isOpen={modal.isOpen} onOpenChange={modal.onOpenChange}>
+            <Modal.Backdrop>
+                <HeroModalPresence onExitComplete={modal.afterClose} />
+                <Modal.Container size="sm">
+                    <Modal.Dialog>
+                        <Modal.CloseTrigger />
+                        <Modal.Header>
+                            <Modal.Heading className="flex items-center gap-2">
+                                <TbPencil aria-hidden="true" />
+                                {t('common.action.rename')}
+                            </Modal.Heading>
+                        </Modal.Header>
+                        <Modal.Body>
+                            <RenameDialogForm
+                                key={renameFrom + ':' + uuid}
+                                definition={renameDefinitions[renameFrom]}
+                                name={name}
+                                uuid={uuid}
+                                modal={modal}
+                            />
+                        </Modal.Body>
+                    </Modal.Dialog>
+                </Modal.Container>
+            </Modal.Backdrop>
+        </Modal>
+    )
 })

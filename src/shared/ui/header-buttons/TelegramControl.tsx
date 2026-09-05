@@ -1,7 +1,6 @@
 import { PiTelegramLogoBold } from 'react-icons/pi'
 
-import { HeaderControl } from './HeaderControl'
-import classes from './TelegramControl.module.css'
+import { HeaderLink } from './HeaderControl'
 
 interface TelegramControlProps {
     link: string
@@ -9,15 +8,15 @@ interface TelegramControlProps {
 
 export function TelegramControl({ link, ...others }: TelegramControlProps) {
     return (
-        <HeaderControl
-            className={classes.telegram}
-            component="a"
+        <HeaderLink
+            aria-label="Telegram community"
+            className="text-accent"
             href={link}
             rel="noopener noreferrer"
             target="_blank"
             {...others}
         >
-            <PiTelegramLogoBold />
-        </HeaderControl>
+            <PiTelegramLogoBold aria-hidden size={22} />
+        </HeaderLink>
     )
 }

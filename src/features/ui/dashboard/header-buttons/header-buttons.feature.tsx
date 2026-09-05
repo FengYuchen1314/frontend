@@ -1,4 +1,4 @@
-import { ActionIcon, Group } from '@mantine/core'
+import { Button } from '@heroui/react'
 import { PiArrowsClockwise, PiSignOutDuotone } from 'react-icons/pi'
 import { useNavigate } from 'react-router'
 
@@ -6,33 +6,49 @@ import { clearQueryClient } from '@shared/api'
 import { ROUTES } from '@shared/constants'
 import { logoutEvents } from '@shared/emitters'
 import { resetAllStores } from '@shared/hocs/store-wrapper'
+import {
+    logoutFromHeader,
+    refreshFromHeader
+} from '@shared/ui/header-buttons/header-controls.model'
 import { LanguagePicker } from '@shared/ui/language-picker/language-picker.shared'
 
 export const HeaderButtons = () => {
     const navigate = useNavigate()
 
     const handleLogout = () => {
-        logoutEvents.emit()
-        navigate(ROUTES.AUTH.LOGIN)
+        logoutFromHeader(
+            () => logoutEvents.emit(),
+            () => navigate(ROUTES.AUTH.LOGIN)
+        )
     }
 
     const handleRefresh = () => {
-        resetAllStores()
-        clearQueryClient()
-        navigate(0)
+        refreshFromHeader(resetAllStores, clearQueryClient, () => navigate(0))
     }
 
     return (
-        <Group grow preventGrowOverflow={false} wrap="wrap">
+        <div className="flex flex-wrap items-center gap-2">
             <LanguagePicker />
 
-            <ActionIcon color="gray" onClick={handleRefresh} size="xl">
-                <PiArrowsClockwise size="24px" />
-            </ActionIcon>
+            <Button
+                aria-label="Refresh dashboard"
+                isIconOnly
+                onPress={handleRefresh}
+                size="lg"
+                variant="secondary"
+            >
+                <PiArrowsClockwise aria-hidden size={24} />
+            </Button>
 
-            <ActionIcon color="cyan" onClick={handleLogout} size="xl">
-                <PiSignOutDuotone size="24px" />
-            </ActionIcon>
-        </Group>
+            <Button
+                aria-label="Log out"
+                isIconOnly
+                onPress={handleLogout}
+                size="lg"
+                variant="secondary"
+            >
+                <PiSignOutDuotone aria-hidden size={24} />
+            </Button>
+        </div>
     )
 }

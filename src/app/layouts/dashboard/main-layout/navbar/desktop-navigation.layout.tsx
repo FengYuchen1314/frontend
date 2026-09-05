@@ -1,131 +1,215 @@
-import { Menu, Menubar } from '@mantine/core'
+import type { ElementType, ReactNode } from 'react'
+
+import { Button, Dropdown, Header, Label } from '@heroui/react'
 import clsx from 'clsx'
-import { ElementType, Fragment } from 'react'
+import { useContext } from 'react'
+import { RootMenuTriggerStateContext } from 'react-aria-components/Menu'
 import { PiCaretDownBold } from 'react-icons/pi'
-import { Link, matchPath, useLocation, useNavigate } from 'react-router'
+import { Link, useLocation } from 'react-router'
 
 import { useDesktopMenuSections } from '../menu-sections/desktop-menu-sections'
 import classes from './desktop-navigation.module.css'
+import {
+    flattenNavigationSection,
+    isNavigationPathActive,
+    isNavigationSectionActive,
+    navigationSectionLanding,
+    nextNavigationIndex
+} from './navigation-model'
+import { useNavigationMenu } from './use-navigation-menu'
 
 const NavIcon = ({ icon: Icon }: { icon?: ElementType }) =>
     Icon ? (
-        <span className={classes.icon}>
+        <span aria-hidden className={classes.icon}>
             <Icon />
         </span>
     ) : null
 
-const isPathActive = (pathname: string, href: string): boolean =>
-    matchPath({ path: href, end: false }, pathname) !== null
-
-const externalLinkProps = (newTab?: boolean) =>
-    newTab ? { rel: 'noopener noreferrer', target: '_blank' } : {}
+function SectionLandingLink({
+    href,
+    className,
+    onClick,
+    children
+}: {
+    href: string
+    className: string
+    onClick: () => void
+    children: ReactNode
+}) {
+    const menu = useContext(RootMenuTriggerStateContext)
+    return (
+        <Link
+            className={className}
+            data-dashboard-nav-trigger
+            to={href}
+            onClick={onClick}
+            onKeyDown={(event) => {
+                if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+                event.preventDefault()
+                menu?.open(event.key === 'ArrowUp' ? 'last' : 'first')
+            }}
+        >
+            {children}
+        </Link>
+    )
+}
 
 export const DesktopNavigation = () => {
     const { pathname } = useLocation()
-    const navigate = useNavigate()
     const menu = useDesktopMenuSections()
+    const state = useNavigationMenu()
 
     return (
-        <Menubar className={classes.navBar} trigger="hover">
-            {menu.map((section) => {
-                const sectionActive = section.section.some((item) => {
-                    if (item.newTab) {
-                        return false
-                    }
-                    const hrefs = [
-                        item.href,
-                        ...(item.dropdownItems?.map((child) => child.href) ?? [])
-                    ]
-                    return hrefs.some((href) => isPathActive(pathname, href))
-                })
-
-                const singleItem =
+        <nav
+            aria-label="Main navigation"
+            className={classes.navBar}
+            onKeyDown={(event) => {
+                if (!(event.target instanceof HTMLElement)) return
+                const triggers = Array.from(
+                    event.currentTarget.querySelectorAll<HTMLElement>(
+                        '[data-dashboard-nav-trigger]'
+                    )
+                )
+                const current = triggers.indexOf(event.target)
+                if (current < 0) return
+                const next = nextNavigationIndex(
+                    event.key,
+                    current,
+                    triggers.length,
+                    document.documentElement.dir === 'rtl'
+                )
+                if (next === null) return
+                event.preventDefault()
+                triggers[next]?.focus()
+            }}
+        >
+            {menu.map((section, index) => {
+                const sectionId = section.id ?? String(index)
+                const active = isNavigationSectionActive(pathname, section)
+                const landing = navigationSectionLanding(section)
+                const single =
                     section.section.length === 1 &&
                     !section.section[0].dropdownItems &&
                     !section.section[0].newTab
                         ? section.section[0]
                         : null
-
-                if (singleItem) {
-                    return (
-                        <Menubar.Menu key={section.id}>
-                            <Menubar.Target
-                                className={clsx(classes.navItem, {
-                                    [classes.navItemActive]: sectionActive
-                                })}
-                                onKeyDown={(event) => {
-                                    if (event.key === 'Enter' || event.key === ' ') {
-                                        navigate(singleItem.href)
-                                    }
-                                }}
-                                {...{ component: Link, to: singleItem.href }}
-                            >
-                                <NavIcon icon={section.icon ?? singleItem.icon} />
-                                <span>{section.header}</span>
-                            </Menubar.Target>
-                        </Menubar.Menu>
-                    )
-                }
-
-                const firstItem = section.section.find((item) => !item.newTab)
-                const firstSectionHref = firstItem?.dropdownItems?.[0]?.href ?? firstItem?.href
-
-                return (
-                    <Menubar.Menu key={section.id} width={250} withinPortal>
-                        <Menubar.Target
-                            className={clsx(classes.navItem, {
-                                [classes.navItemActive]: sectionActive
-                            })}
-                            {...(firstSectionHref ? { component: Link, to: firstSectionHref } : {})}
+                const groups = section.section.map((item) => ({
+                    label: item.dropdownItems ? item.name : undefined,
+                    id: item.id,
+                    items: flattenNavigationSection({ ...section, section: [item] })
+                }))
+                return single ? (
+                    <Link
+                        aria-current={active ? 'page' : undefined}
+                        className={clsx(classes.navItem, active && classes.navItemActive)}
+                        data-dashboard-nav-trigger
+                        key={sectionId}
+                        to={single.href}
+                    >
+                        <NavIcon icon={section.icon ?? single.icon} />
+                        <span>{section.header}</span>
+                    </Link>
+                ) : (
+                    <Dropdown
+                        isOpen={state.openId === sectionId}
+                        key={sectionId}
+                        onOpenChange={(open) => state.setOpen(sectionId, open)}
+                    >
+                        <div
+                            className={classes.sectionEntry}
+                            onPointerEnter={(event) => {
+                                if (event.pointerType === 'mouse') state.setOpen(sectionId, true)
+                            }}
+                            onPointerLeave={(event) => {
+                                if (event.pointerType === 'mouse') state.scheduleClose(sectionId)
+                            }}
                         >
-                            <NavIcon icon={section.icon} />
-                            <span>{section.header}</span>
-                            <PiCaretDownBold className={classes.caret} size={11} />
-                        </Menubar.Target>
-                        <Menubar.Dropdown>
-                            {section.section.map((item, index) =>
-                                item.dropdownItems ? (
-                                    <Fragment key={item.id}>
-                                        {index > 0 && <Menu.Divider />}
-                                        <Menu.Label>{item.name}</Menu.Label>
-                                        {item.dropdownItems.map((dropdownItem) => (
-                                            <Menu.Item
-                                                className={clsx({
-                                                    [classes.menuItemActive]: isPathActive(
-                                                        pathname,
-                                                        dropdownItem.href
-                                                    )
-                                                })}
-                                                component={Link}
-                                                key={dropdownItem.id}
-                                                leftSection={<NavIcon icon={dropdownItem.icon} />}
-                                                to={dropdownItem.href}
-                                            >
-                                                {dropdownItem.name}
-                                            </Menu.Item>
-                                        ))}
-                                        {index < section.section.length - 1 && <Menu.Divider />}
-                                    </Fragment>
-                                ) : (
-                                    <Menu.Item
-                                        className={clsx({
-                                            [classes.menuItemActive]:
-                                                !item.newTab && isPathActive(pathname, item.href)
-                                        })}
-                                        component={Link}
-                                        key={item.id}
-                                        leftSection={<NavIcon icon={item.icon} />}
-                                        to={item.href}
-                                        {...externalLinkProps(item.newTab)}
-                                    >
-                                        {item.name}
-                                    </Menu.Item>
-                                )
+                            {landing && (
+                                <SectionLandingLink
+                                    className={clsx(
+                                        classes.navItem,
+                                        active && classes.navItemActive
+                                    )}
+                                    href={landing}
+                                    onClick={() => state.setOpen(sectionId, false)}
+                                >
+                                    <NavIcon icon={section.icon} />
+                                    <span>{section.header}</span>
+                                </SectionLandingLink>
                             )}
-                        </Menubar.Dropdown>
-                    </Menubar.Menu>
+                            <Button
+                                aria-label={section.header ?? 'Navigation'}
+                                className={clsx(
+                                    classes.navItem,
+                                    landing && classes.caretButton,
+                                    active && classes.navItemActive
+                                )}
+                                data-dashboard-nav-trigger
+                                variant="ghost"
+                            >
+                                {!landing && (
+                                    <>
+                                        <NavIcon icon={section.icon} />
+                                        <span>{section.header}</span>
+                                    </>
+                                )}
+                                <PiCaretDownBold aria-hidden size={11} />
+                            </Button>
+                        </div>
+                        <Dropdown.Popover
+                            className={classes.popover}
+                            onPointerEnter={state.cancelClose}
+                            onPointerLeave={() => state.scheduleClose(sectionId)}
+                            placement="bottom end"
+                            isNonModal
+                        >
+                            <Dropdown.Menu aria-label={section.header ?? 'Navigation'}>
+                                {groups.map((group) => (
+                                    <Dropdown.Section
+                                        key={group.id}
+                                        aria-label={group.label ?? section.header}
+                                    >
+                                        {group.label && <Header>{group.label}</Header>}
+                                        {group.items.map((item) => (
+                                            <Dropdown.Item
+                                                aria-current={
+                                                    isNavigationPathActive(
+                                                        pathname,
+                                                        item.href,
+                                                        item.newTab
+                                                    )
+                                                        ? 'page'
+                                                        : undefined
+                                                }
+                                                className={
+                                                    isNavigationPathActive(
+                                                        pathname,
+                                                        item.href,
+                                                        item.newTab
+                                                    )
+                                                        ? classes.menuItemActive
+                                                        : undefined
+                                                }
+                                                href={item.href}
+                                                id={item.id}
+                                                key={item.id}
+                                                rel={
+                                                    item.newTab ? 'noopener noreferrer' : undefined
+                                                }
+                                                target={item.newTab ? '_blank' : undefined}
+                                                textValue={item.name}
+                                            >
+                                                <NavIcon icon={item.icon} />
+                                                <Label>{item.name}</Label>
+                                            </Dropdown.Item>
+                                        ))}
+                                    </Dropdown.Section>
+                                ))}
+                            </Dropdown.Menu>
+                        </Dropdown.Popover>
+                    </Dropdown>
                 )
             })}
-        </Menubar>
+        </nav>
     )
 }

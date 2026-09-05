@@ -1,73 +1,66 @@
-import { Group, Text } from '@mantine/core'
-import { modals } from '@mantine/modals'
-import clsx from 'clsx'
-import { useMemo } from 'react'
-import semver from 'semver'
+import { Modal } from '@heroui/react'
+import { TbRefresh } from 'react-icons/tb'
 
 import { useGetRemnawaveMetadata } from '@shared/api/hooks'
 
 import { useRemnawaveInfo } from '@entities/dashboard/updates-store'
 
 import { Logo } from '../logo'
-import { BaseOverlayHeader } from '../overlays/base-overlay-header'
 import { BuildInfoModal } from '../sidebar/build-info-modal'
+import { versionPresentation } from './header-controls.model'
 import { HeaderControl } from './HeaderControl'
 import { SkeletonHeaderControl } from './SkeletonHeaderControl'
-import classes from './VersionControl.module.css'
+import { useDialogOperationScope, useDialogSessionKey } from './use-control-lifetime'
 
 export function VersionControl() {
     const remnawaveInfo = useRemnawaveInfo()
-    const { data: remnawaveMetadata, isLoading } = useGetRemnawaveMetadata()
-
-    const [isNewVersionAvailable, isDev] = useMemo(() => {
-        if (!remnawaveMetadata) return [false, false]
-
-        const currentVersion = remnawaveMetadata.version
-        const latest = remnawaveInfo.latestVersion || '0.0.0'
-        return [semver.gt(latest, currentVersion), remnawaveMetadata.git.backend.branch !== 'main']
-    }, [remnawaveInfo.latestVersion, remnawaveMetadata])
-
-    if (isLoading || !remnawaveMetadata) {
-        return <SkeletonHeaderControl width={85} />
-    }
-
-    const handleClick = () => {
-        modals.open({
-            title: (
-                <BaseOverlayHeader
-                    iconColor="teal"
-                    IconComponent={Logo}
-                    iconVariant="soft"
-                    title="Build Info"
-                />
-            ),
-            centered: true,
-            size: 'md',
-            withCloseButton: true,
-            children: (
-                <BuildInfoModal
-                    isNewVersionAvailable={isNewVersionAvailable}
-                    remnawaveMetadata={remnawaveMetadata}
-                />
-            )
-        })
-    }
-
+    const { data: metadata, isLoading, isFetching, error, refetch } = useGetRemnawaveMetadata()
+    const session = useDialogSessionKey()
+    const scope = useDialogOperationScope()
+    if (isLoading) return <SkeletonHeaderControl width={85} />
+    if (!metadata)
+        return (
+            <HeaderControl
+                aria-label="Retry loading build information"
+                isDisabled={isFetching}
+                onPress={() => void refetch()}
+            >
+                <TbRefresh aria-hidden size={20} />
+                {error ? 'Build info unavailable' : 'Build info'}
+            </HeaderControl>
+        )
+    const { isNewVersionAvailable, isDev } = versionPresentation(
+        metadata.version,
+        remnawaveInfo.latestVersion,
+        metadata.git.backend.branch
+    )
     return (
-        <HeaderControl
-            className={clsx(classes.version, {
-                [classes.newVersion]: isNewVersionAvailable && !isDev,
-                [classes.dev]: isDev
-            })}
-            onClick={handleClick}
-            w="auto"
-        >
-            <Group gap={8} ml={10} mr={10} wrap="nowrap">
+        <Modal key={session} onOpenChange={scope.onOpenChange}>
+            <HeaderControl
+                aria-label={`Build info: ${metadata.version}`}
+                className={isDev ? 'text-warning' : isNewVersionAvailable ? 'text-accent' : ''}
+            >
                 <Logo size={20} />
-                <Text ff="text" fw={600} size="sm">
-                    {remnawaveMetadata.version}
-                </Text>
-            </Group>
-        </HeaderControl>
+                {metadata.version}
+            </HeaderControl>
+            <Modal.Backdrop>
+                <Modal.Container placement="center" size="lg">
+                    <Modal.Dialog>
+                        <Modal.CloseTrigger aria-label="Close build information" />
+                        <Modal.Header>
+                            <Modal.Heading>Build Info</Modal.Heading>
+                        </Modal.Header>
+                        <Modal.Body>
+                            <BuildInfoModal
+                                isNewVersionAvailable={isNewVersionAvailable}
+                                key={scope.generation}
+                                remnawaveMetadata={metadata}
+                                signal={scope.signal}
+                            />
+                        </Modal.Body>
+                    </Modal.Dialog>
+                </Modal.Container>
+            </Modal.Backdrop>
+        </Modal>
     )
 }

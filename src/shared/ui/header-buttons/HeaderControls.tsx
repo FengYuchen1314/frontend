@@ -1,4 +1,4 @@
-import { BoxProps, Group } from '@mantine/core'
+import type { HTMLAttributes } from 'react'
 
 import { GithubControl } from './GithubControl'
 import { LanguageControl } from './LanguageControl'
@@ -9,7 +9,7 @@ import { SupportControl } from './SupportControl'
 import { TelegramControl } from './TelegramControl'
 import { VersionControl } from './VersionControl'
 
-interface HeaderControlsProps extends BoxProps {
+interface HeaderControlsProps extends HTMLAttributes<HTMLDivElement> {
     githubLink?: string
     isGithubLoading?: boolean
     stars?: number
@@ -37,21 +37,22 @@ export function HeaderControls({
     telegramLink,
     stars,
     isGithubLoading,
+    className = '',
     ...others
 }: HeaderControlsProps) {
     return (
-        <Group gap="xs" {...others}>
+        <div className={`flex flex-wrap items-center gap-2 ${className}`} {...others}>
             {withTelegram && <TelegramControl link={telegramLink} />}
             {withPrime && <PrimeControl />}
             {withSupport && <SupportControl />}
 
             {withVersion && <VersionControl />}
-            {withGithub && (
-                <GithubControl isLoading={isGithubLoading} link={githubLink!} stars={stars} />
+            {withGithub && githubLink && (
+                <GithubControl isLoading={isGithubLoading} link={githubLink} stars={stars} />
             )}
             {withRecap && <RecapControl />}
             {withLanguage && <LanguageControl />}
             {withLogout && <LogoutControl />}
-        </Group>
+        </div>
     )
 }

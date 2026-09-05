@@ -1,7 +1,6 @@
-import { Group } from '@mantine/core'
-import { useClickOutside, useDisclosure } from '@mantine/hooks'
+import { useState, type ReactNode } from 'react'
 
-import { HeaderControls } from '@shared/ui'
+import { HeaderControls } from '@shared/ui/header-buttons'
 
 import { IRemnawaveInfo } from '@entities/dashboard/updates-store'
 
@@ -9,29 +8,25 @@ import { DASHBOARD_LINKS } from '../layout-shared'
 import { SidebarShellLayout } from './sidebar-shell.layout'
 
 interface IProps {
-    headerControls: React.ReactNode
+    headerControls: ReactNode
     isLoadingUpdates: boolean
     isSocialButtons: boolean
     remnawaveInfo: IRemnawaveInfo
 }
 
-export const MobileLayout = (props: IProps) => {
-    const { headerControls, isLoadingUpdates, isSocialButtons, remnawaveInfo } = props
-
-    const [opened, { toggle }] = useDisclosure()
-
-    const ref = useClickOutside(() => {
-        if (opened) {
-            toggle()
-        }
-    })
-
+export const MobileLayout = ({
+    headerControls,
+    isLoadingUpdates,
+    isSocialButtons,
+    remnawaveInfo
+}: IProps) => {
+    const [opened, setOpened] = useState(false)
     return (
         <SidebarShellLayout
-            closedSide="mobile"
+            mode="mobile"
             footer={
                 isSocialButtons && (
-                    <Group justify="center" mt="md" style={{ flexShrink: 0 }}>
+                    <div className="flex shrink-0 flex-wrap items-center justify-center gap-2 pt-4">
                         <HeaderControls
                             {...DASHBOARD_LINKS}
                             isGithubLoading={isLoadingUpdates}
@@ -40,15 +35,12 @@ export const MobileLayout = (props: IProps) => {
                             withLogout={false}
                             withVersion={false}
                         />
-                    </Group>
+                    </div>
                 )
             }
             headerControls={headerControls}
-            navbarRef={ref}
-            onNavClose={toggle}
             opened={opened}
-            padding="md"
-            toggle={toggle}
+            onOpenChange={setOpened}
         />
     )
 }

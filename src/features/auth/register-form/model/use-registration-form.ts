@@ -1,6 +1,6 @@
 import { toast } from '@heroui/react'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useEffect, useMemo, useRef } from 'react'
+import { type FormEvent, useEffect, useMemo, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 
@@ -21,27 +21,47 @@ export function useRegistrationForm() {
         defaultValues: { username: '', password: '', confirmPassword: '' }
     })
     const copyAttempt = useRef(0)
+    const submitAttempt = useRef(0)
     useEffect(
         () => () => {
             copyAttempt.current++
+            submitAttempt.current++
         },
         []
     )
-    const { mutate: register, isPending } = useRegister()
-    const submit = form.handleSubmit(({ username, password }) => {
-        form.clearErrors('root')
-        register(
-            { variables: { username, password } },
-            {
-                onError: (error) =>
-                    applyAuthFormErrors(error, form.setError, [
-                        'username',
-                        'password',
-                        'confirmPassword'
-                    ])
+    const { mutate: register, isPending } = useRegister({
+        captureOwnership: () => {
+            const attempt = submitAttempt.current
+            const generation = getSessionGeneration()
+            return {
+                isCurrent: () =>
+                    attempt === submitAttempt.current && generation === getSessionGeneration()
             }
-        )
+        }
     })
+    const submit = (event?: FormEvent<HTMLFormElement>) => {
+        const attempt = ++submitAttempt.current
+        const generation = getSessionGeneration()
+        const current = () =>
+            attempt === submitAttempt.current && generation === getSessionGeneration()
+        return form.handleSubmit(({ username, password }) => {
+            if (!current()) return
+            form.clearErrors('root')
+            register(
+                { variables: { username, password } },
+                {
+                    onError: (error) => {
+                        if (current())
+                            applyAuthFormErrors(error, form.setError, [
+                                'username',
+                                'password',
+                                'confirmPassword'
+                            ])
+                    }
+                }
+            )
+        })(event)
+    }
     const generatePassword = async () => {
         const attempt = ++copyAttempt.current
         const generation = getSessionGeneration()

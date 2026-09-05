@@ -1,32 +1,31 @@
-import { rem } from '@mantine/core'
-import { modals } from '@mantine/modals'
+import { Modal } from '@heroui/react'
 import { RecapContent } from '@widgets/dashboard/recap/recap.content.widget'
 import { TbSparkles } from 'react-icons/tb'
 
-import { BaseOverlayHeader } from '../overlays/base-overlay-header'
 import { HeaderControl } from './HeaderControl'
+import { useDialogOperationScope, useDialogSessionKey } from './use-control-lifetime'
 
 export function RecapControl() {
-    const handleClick = () => {
-        modals.open({
-            title: (
-                <BaseOverlayHeader
-                    iconColor="indigo"
-                    IconComponent={TbSparkles}
-                    iconVariant="soft"
-                    title="Recap"
-                />
-            ),
-            centered: true,
-            size: '980px',
-            withCloseButton: true,
-            children: <RecapContent />
-        })
-    }
-
+    const session = useDialogSessionKey()
+    const scope = useDialogOperationScope()
     return (
-        <HeaderControl onClick={handleClick}>
-            <TbSparkles style={{ width: rem(22), height: rem(22) }} />
-        </HeaderControl>
+        <Modal key={session} onOpenChange={scope.onOpenChange}>
+            <HeaderControl aria-label="Recap" isIconOnly>
+                <TbSparkles aria-hidden size={22} />
+            </HeaderControl>
+            <Modal.Backdrop>
+                <Modal.Container className="max-w-[1100px]" placement="center" size="cover">
+                    <Modal.Dialog>
+                        <Modal.CloseTrigger aria-label="Close Recap" />
+                        <Modal.Header>
+                            <Modal.Heading>Recap</Modal.Heading>
+                        </Modal.Header>
+                        <Modal.Body>
+                            <RecapContent key={scope.generation} signal={scope.signal} />
+                        </Modal.Body>
+                    </Modal.Dialog>
+                </Modal.Container>
+            </Modal.Backdrop>
+        </Modal>
     )
 }

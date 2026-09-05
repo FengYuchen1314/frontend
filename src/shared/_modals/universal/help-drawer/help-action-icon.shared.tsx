@@ -1,46 +1,36 @@
-import { ActionIcon, ActionIconProps, Tooltip } from '@mantine/core'
+import type { THelpDrawerAvailableScreen } from './help-drawer.types'
+import type { IconBaseProps } from 'react-icons/lib'
+
+import { Button, type ButtonProps, Tooltip } from '@heroui/react'
 import { memo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { IconBaseProps } from 'react-icons/lib'
 import { TbQuestionMark } from 'react-icons/tb'
 
 import { showModal } from '@shared/_modals/show-modal'
 
-import { THelpDrawerAvailableScreen } from './help-drawer.types'
-
 interface IProps {
-    actionIconProps?: Omit<ActionIconProps, 'onClick'>
+    buttonProps?: Omit<ButtonProps, 'onPress' | 'children'>
     hidden?: boolean
     iconProps?: IconBaseProps
     screen: THelpDrawerAvailableScreen
 }
-
-export const HelpActionIconShared = memo((props: IProps) => {
-    const { actionIconProps, hidden, iconProps, screen } = props
-
+export const HelpActionIconShared = memo(({ buttonProps, hidden, iconProps, screen }: IProps) => {
     const { t } = useTranslation()
-
-    if (hidden) {
-        return null
-    }
-
-    const handleOpenHelpDrawer = () => {
-        showModal('helpDrawer', {
-            screen
-        })
-    }
-
+    if (hidden) return null
     return (
-        <Tooltip label={t('help-action-icon.shared.help-article')}>
-            <ActionIcon
-                color="lime"
-                onClick={handleOpenHelpDrawer}
-                size="input-md"
-                variant="soft"
-                {...actionIconProps}
+        <Tooltip>
+            <Button
+                isIconOnly
+                variant="secondary"
+                aria-label={t('help-action-icon.shared.help-article')}
+                {...buttonProps}
+                onPress={() => {
+                    void showModal('helpDrawer', { screen })
+                }}
             >
-                <TbQuestionMark size={24} {...iconProps} />
-            </ActionIcon>
+                <TbQuestionMark aria-hidden="true" size={24} {...iconProps} />
+            </Button>
+            <Tooltip.Content>{t('help-action-icon.shared.help-article')}</Tooltip.Content>
         </Tooltip>
     )
 })

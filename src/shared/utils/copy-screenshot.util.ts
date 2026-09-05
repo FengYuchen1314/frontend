@@ -103,18 +103,41 @@ function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
     })
 }
 
-function screenshotBlob(target: ScreenshotTarget): Promise<Blob> {
+function screenshotBlob(target: ScreenshotTarget, signal?: AbortSignal): Promise<Blob> {
     return Promise.resolve()
-        .then(() => (typeof target === 'function' ? target() : target))
-        .then((element) => renderScreenshot(element))
-        .then((canvas) => canvasToBlob(canvas))
+        .then(() => {
+            signal?.throwIfAborted()
+            return typeof target === 'function' ? target() : target
+        })
+        .then((element) => {
+            signal?.throwIfAborted()
+            return renderScreenshot(element)
+        })
+        .then((canvas) => {
+            signal?.throwIfAborted()
+            return canvasToBlob(canvas)
+        })
+        .then((blob) => {
+            signal?.throwIfAborted()
+            return blob
+        })
 }
 
-function imageScreenshotBlob(image: HTMLImageElement): Promise<Blob> {
-    return renderImageScreenshot(image).then((canvas) => canvasToBlob(canvas))
+function imageScreenshotBlob(image: HTMLImageElement, signal?: AbortSignal): Promise<Blob> {
+    signal?.throwIfAborted()
+    return renderImageScreenshot(image)
+        .then((canvas) => {
+            signal?.throwIfAborted()
+            return canvasToBlob(canvas)
+        })
+        .then((blob) => {
+            signal?.throwIfAborted()
+            return blob
+        })
 }
 
-function downloadBlob(blob: Blob, filename: string): void {
+function downloadBlob(blob: Blob, filename: string, signal?: AbortSignal): void {
+    signal?.throwIfAborted()
     const url = URL.createObjectURL(blob)
 
     const a = document.createElement('a')
@@ -122,26 +145,42 @@ function downloadBlob(blob: Blob, filename: string): void {
     a.href = url
     a.rel = 'noopener'
 
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-
-    setTimeout(() => URL.revokeObjectURL(url), 10_000)
+    try {
+        document.body.appendChild(a)
+        signal?.throwIfAborted()
+        a.click()
+    } finally {
+        a.remove()
+        setTimeout(() => URL.revokeObjectURL(url), 10_000)
+    }
 }
 
-function copyBlobToClipboard(blob: Blob): Promise<void> {
+function copyBlobToClipboard(blob: Blob, signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted()
     return navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
 }
 
-async function copyPendingBlobToClipboard(blobPromise: Promise<Blob>): Promise<void> {
+async function copyPendingBlobToClipboard(
+    blobPromise: Promise<Blob>,
+    signal?: AbortSignal
+): Promise<void> {
     let renderError: unknown
 
-    const guarded = blobPromise.catch((error) => {
-        renderError = error
-        throw error
-    })
+    const guarded = blobPromise
+        .then((blob) => {
+            signal?.throwIfAborted()
+            return blob
+        })
+        .catch((error) => {
+            renderError = error
+            throw error
+        })
+    // The browser may reject before consuming its Blob promise (permissions or
+    // unsupported ClipboardItem). Still observe a later rendering cancellation.
+    void guarded.catch(() => {})
 
     try {
+        signal?.throwIfAborted()
         await navigator.clipboard.write([new ClipboardItem({ 'image/png': guarded })])
     } catch (error) {
         throw renderError ?? error
@@ -159,64 +198,79 @@ function canShareFiles(): boolean {
     )
 }
 
-async function shareBlob(blob: Blob, filename: string): Promise<boolean> {
+async function shareBlob(blob: Blob, filename: string, signal?: AbortSignal): Promise<boolean> {
+    signal?.throwIfAborted()
     if (!canShareFiles()) return false
 
     try {
+        signal?.throwIfAborted()
         await navigator.share({ files: [shareableFile(blob, filename)] })
+        signal?.throwIfAborted()
         return true
     } catch (error) {
+        signal?.throwIfAborted()
         return error instanceof DOMException && error.name === 'AbortError'
     }
 }
 
-async function shareOrCopyBlob(blob: Blob, filename: string): Promise<void> {
-    if (await shareBlob(blob, filename)) return
+async function shareOrCopyBlob(blob: Blob, filename: string, signal?: AbortSignal): Promise<void> {
+    if (await shareBlob(blob, filename, signal)) return
 
-    await copyBlobToClipboard(blob)
+    await copyBlobToClipboard(blob, signal)
 }
 
-async function shareOrSaveBlob(blob: Blob, filename: string): Promise<void> {
-    if (prefersNativeShare && (await shareBlob(blob, filename))) return
+async function shareOrSaveBlob(blob: Blob, filename: string, signal?: AbortSignal): Promise<void> {
+    if (prefersNativeShare && (await shareBlob(blob, filename, signal))) return
 
-    downloadBlob(blob, filename)
+    downloadBlob(blob, filename, signal)
 }
 
 export async function copyScreenshotToClipboard(
     target: ScreenshotTarget,
-    filename = 'screenshot.png'
+    filename = 'screenshot.png',
+    signal?: AbortSignal
 ): Promise<void> {
     assertScreenshotSupported()
+    signal?.throwIfAborted()
 
     if (canShareFiles()) {
-        await shareOrCopyBlob(await screenshotBlob(target), filename)
+        await shareOrCopyBlob(await screenshotBlob(target, signal), filename, signal)
         return
     }
 
-    await copyPendingBlobToClipboard(screenshotBlob(target))
+    await copyPendingBlobToClipboard(screenshotBlob(target, signal), signal)
 }
 
-export async function downloadScreenshot(element: HTMLElement, filename: string): Promise<void> {
+export async function downloadScreenshot(
+    element: HTMLElement,
+    filename: string,
+    signal?: AbortSignal
+): Promise<void> {
     assertScreenshotSupported()
+    signal?.throwIfAborted()
 
-    await shareOrSaveBlob(await screenshotBlob(element), filename)
+    await shareOrSaveBlob(await screenshotBlob(element, signal), filename, signal)
 }
 
 export async function copyImageScreenshotToClipboard(
     image: HTMLImageElement,
-    filename: string
+    filename: string,
+    signal?: AbortSignal
 ): Promise<void> {
+    signal?.throwIfAborted()
     if (canShareFiles()) {
-        await shareOrCopyBlob(await imageScreenshotBlob(image), filename)
+        await shareOrCopyBlob(await imageScreenshotBlob(image, signal), filename, signal)
         return
     }
 
-    await copyPendingBlobToClipboard(imageScreenshotBlob(image))
+    await copyPendingBlobToClipboard(imageScreenshotBlob(image, signal), signal)
 }
 
 export async function downloadImageScreenshot(
     image: HTMLImageElement,
-    filename: string
+    filename: string,
+    signal?: AbortSignal
 ): Promise<void> {
-    await shareOrSaveBlob(await imageScreenshotBlob(image), filename)
+    signal?.throwIfAborted()
+    await shareOrSaveBlob(await imageScreenshotBlob(image, signal), filename, signal)
 }

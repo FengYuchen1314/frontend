@@ -1,32 +1,23 @@
-import { Text } from '@mantine/core'
-import { useMemo } from 'react'
-
 import { useGetAuthStatus } from '@shared/api/hooks/auth/auth.query.hooks'
-import { parseColoredTextUtil } from '@shared/utils/misc'
+import { parseColoredTextUtil } from '@shared/utils/misc/parse-colored-text'
 
 import classes from './sidebar.module.css'
 
 export const SidebarTitleShared = () => {
     const { data: authStatus } = useGetAuthStatus()
-
-    const titleParts = useMemo(() => {
-        if (authStatus?.branding.title) {
-            return parseColoredTextUtil(authStatus.branding.title)
-        }
-
-        return [
-            { text: 'Remna', color: 'cyan' },
-            { text: 'wave', color: 'white' }
-        ]
-    }, [authStatus])
-
+    const titleParts = authStatus?.branding.title
+        ? parseColoredTextUtil(authStatus.branding.title, 'var(--foreground)')
+        : [
+              { text: 'Remna', color: 'var(--accent)' },
+              { text: 'wave', color: 'var(--foreground)' }
+          ]
     return (
-        <Text className={classes.logoTitle}>
+        <span className={classes.logoTitle}>
             {titleParts.map((part, index) => (
-                <Text c={part.color || 'white'} component="span" inherit key={index}>
+                <span key={index} style={{ color: part.color || 'var(--foreground)' }}>
                     {part.text}
-                </Text>
+                </span>
             ))}
-        </Text>
+        </span>
     )
 }

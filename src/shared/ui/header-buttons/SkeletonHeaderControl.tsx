@@ -1,11 +1,15 @@
-import { Box } from '@mantine/core'
-
-import classes from './SkeletonHeaderControl.module.css'
+import { Skeleton } from '@heroui/react'
 
 interface SkeletonHeaderControlProps {
     width?: number | string
 }
 
 export function SkeletonHeaderControl({ width = 44 }: SkeletonHeaderControlProps) {
-    return <Box className={classes.skeleton} h={44} w={width} />
+    return (
+        <Skeleton
+            aria-label="Loading header information"
+            className="h-11 rounded-xl"
+            style={{ width }}
+        />
+    )
 }

@@ -1,81 +1,83 @@
-import { Box, Divider, NavLink, Stack, Title } from '@mantine/core'
+import { Disclosure } from '@heroui/react'
+import clsx from 'clsx'
 import { PiArrowRight } from 'react-icons/pi'
-import { NavLink as RouterLink, useLocation } from 'react-router'
+import { Link, useLocation } from 'react-router'
 
 import { useMobileMenuSections } from '../menu-sections/mobile-menu-sections'
 import classes from './mobile-navigation.module.css'
+import { isNavigationPathActive } from './navigation-model'
 
-interface IProps {
-    onClose?: () => void
-}
-
-export const MobileNavigation = (props: IProps) => {
-    const { onClose } = props
+export const MobileNavigation = ({ onClose }: { onClose?: () => void }) => {
     const { pathname } = useLocation()
-
     const menu = useMobileMenuSections()
 
     return (
-        <Stack gap="md" pb="md" pt="md">
-            {menu.map((item, index) => (
-                <Box key={item.id}>
-                    {index > 0 && <Divider color="cyan.4" mb="lg" opacity={0.3} variant="dashed" />}
-                    <Title className={classes.sectionTitle} order={6}>
-                        {item.header}
-                    </Title>
-
-                    <Stack gap={1}>
-                        {item.section.map((subItem) =>
-                            subItem.dropdownItems ? (
-                                <NavLink
-                                    active={false}
-                                    childrenOffset={0}
-                                    className={classes.sectionLink}
-                                    key={subItem.id}
-                                    label={subItem.name}
-                                    leftSection={subItem.icon && <subItem.icon />}
-                                    variant="light"
+        <nav aria-label="Main navigation" className={classes.sections}>
+            {menu.map((section) => (
+                <section className={classes.section} key={section.id}>
+                    <h2 className={classes.sectionTitle}>{section.header}</h2>
+                    <div className={classes.links}>
+                        {section.section.map((item) =>
+                            item.dropdownItems ? (
+                                <Disclosure
+                                    defaultExpanded={item.dropdownItems.some((child) =>
+                                        isNavigationPathActive(pathname, child.href)
+                                    )}
+                                    key={item.id}
                                 >
-                                    {subItem.dropdownItems?.map((dropdownItem) => (
-                                        <NavLink
-                                            active={pathname.includes(dropdownItem.href)}
-                                            className={classes.sectionDropdownItemLink}
-                                            component={RouterLink}
-                                            key={dropdownItem.id}
-                                            label={dropdownItem.name}
-                                            leftSection={
-                                                dropdownItem.icon ? (
-                                                    <dropdownItem.icon />
-                                                ) : (
-                                                    <PiArrowRight />
-                                                )
-                                            }
-                                            onClick={onClose}
-                                            to={dropdownItem.href}
-                                            variant="subtle"
-                                        />
-                                    ))}
-                                </NavLink>
+                                    <Disclosure.Heading level={3}>
+                                        <Disclosure.Trigger className={classes.sectionLink}>
+                                            <span aria-hidden>{item.icon && <item.icon />}</span>
+                                            <span>{item.name}</span>
+                                            <Disclosure.Indicator className="ms-auto" />
+                                        </Disclosure.Trigger>
+                                    </Disclosure.Heading>
+                                    <Disclosure.Content>
+                                        {item.dropdownItems.map((child) => (
+                                            <Link
+                                                aria-current={
+                                                    isNavigationPathActive(pathname, child.href)
+                                                        ? 'page'
+                                                        : undefined
+                                                }
+                                                className={clsx(
+                                                    classes.sectionLink,
+                                                    classes.childLink
+                                                )}
+                                                key={child.id}
+                                                onClick={onClose}
+                                                to={child.href}
+                                            >
+                                                <span aria-hidden>
+                                                    {child.icon ? <child.icon /> : <PiArrowRight />}
+                                                </span>
+                                                <span>{child.name}</span>
+                                            </Link>
+                                        ))}
+                                    </Disclosure.Content>
+                                </Disclosure>
                             ) : (
-                                <NavLink
-                                    active={pathname === subItem.href}
+                                <Link
+                                    aria-current={
+                                        isNavigationPathActive(pathname, item.href, item.newTab)
+                                            ? 'page'
+                                            : undefined
+                                    }
                                     className={classes.sectionLink}
-                                    component={RouterLink}
-                                    key={subItem.id}
-                                    label={subItem.name}
-                                    leftSection={subItem.icon && <subItem.icon />}
+                                    key={item.id}
                                     onClick={onClose}
-                                    to={subItem.href}
-                                    variant="subtle"
-                                    {...(subItem.newTab
-                                        ? { target: '_blank', rel: 'noopener noreferrer' }
-                                        : {})}
-                                />
+                                    rel={item.newTab ? 'noopener noreferrer' : undefined}
+                                    target={item.newTab ? '_blank' : undefined}
+                                    to={item.href}
+                                >
+                                    <span aria-hidden>{item.icon && <item.icon />}</span>
+                                    <span>{item.name}</span>
+                                </Link>
                             )
                         )}
-                    </Stack>
-                </Box>
+                    </div>
+                </section>
             ))}
-        </Stack>
+        </nav>
     )
 }

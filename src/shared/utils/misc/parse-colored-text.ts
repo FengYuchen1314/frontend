@@ -6,7 +6,7 @@
  * a six-digit hex code (with or without a leading #) or any string representing a color,
  * and `word` is the sequence of non-whitespace, non-brace characters that follows.
  *
- * All other text (plain, outside braces) is grouped as "normal" and assigned the color `'white'`.
+ * All other text (plain, outside braces) uses the supplied default color (legacy: white).
  *
  * Examples:
  *   - "{ff0000}Remna{00ff00}wave" =>
@@ -23,7 +23,10 @@
  * @param text - The text to parse, possibly containing color-annotated segments.
  * @returns An array of objects, each with `text` and `color` properties.
  */
-export function parseColoredTextUtil(text: string): Array<{ color: string; text: string }> {
+export function parseColoredTextUtil(
+    text: string,
+    defaultColor = 'white'
+): Array<{ color: string; text: string }> {
     const parts: Array<{ color: string; text: string }> = []
     let i = 0
 
@@ -60,9 +63,9 @@ export function parseColoredTextUtil(text: string): Array<{ color: string; text:
         }
 
         if (normalText) {
-            parts.push({ text: normalText, color: 'white' })
+            parts.push({ text: normalText, color: defaultColor })
         }
     }
 
-    return parts.length > 0 ? parts : [{ text, color: 'white' }]
+    return parts.length > 0 ? parts : [{ text, color: defaultColor }]
 }

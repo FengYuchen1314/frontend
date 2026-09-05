@@ -1,21 +1,22 @@
-@keyframes fadein {
-    from {
-        opacity: 0;
-    }
-    to {
-        opacity: 1;
-    }
+.logoLink {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    border-radius: 0.5rem;
 }
-
-.fadeIn {
-    animation: fadein 0.2s ease-out;
+.logoLink:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
 }
-
+.brandImage {
+    width: 1.875rem;
+    height: 1.875rem;
+    object-fit: contain;
+}
 .logoTitle {
     font-family: 'Unbounded', sans-serif;
     font-weight: 700;
-    font-size: var(--mantine-font-size-lg);
+    font-size: 1.125rem;
+    overflow-wrap: anywhere;
     user-select: none;
-    -webkit-user-select: none;
-    animation: fadein 0.2s ease-out;
 }

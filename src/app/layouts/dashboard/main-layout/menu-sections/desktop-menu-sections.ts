@@ -21,8 +21,8 @@ import {
     TbWebhook
 } from 'react-icons/tb'
 
-import { ROUTES } from '@shared/constants'
-import { Logo } from '@shared/ui'
+import { ROUTES } from '@shared/constants/routes'
+import { Logo } from '@shared/ui/logo'
 import { MihomoLogo, SingboxLogo, StashLogo, XrayLogo } from '@shared/ui/logos'
 
 import { MenuItem } from './interfaces'

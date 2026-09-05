@@ -30,6 +30,7 @@ const { clearQueryClient, queryClient } = await import('../../api/query-client.t
 const { logoutEvents } = await import('../../emitters/emit-logout.ts')
 const { create, resetAllStores } = await import('../store-wrapper/store-wrapper.ts')
 const { ROUTES } = await import('../../constants/routes.ts')
+const { logoutFromHeader } = await import('../../ui/header-buttons/header-controls.model.ts')
 const { useLogin, useRegister, useOauth2Callback } =
     await import('../../api/hooks/auth/auth.hooks.ts')
 const { toast } = await import('@heroui/react')
@@ -503,7 +504,12 @@ for (const relative of [
         privateStore.setState({ record: 'first-session-record' })
         queryClient.setQueryData(['private'], 'first-session-record')
         const navigations: string[] = []
-        const scope = { logoutEvents, navigate: (path: string) => navigations.push(path), ROUTES }
+        const scope = {
+            logoutEvents,
+            logoutFromHeader,
+            navigate: (path: string) => navigations.push(path),
+            ROUTES
+        }
         const javascript = ts.transpileModule(`return ${expression.getText(file)}`, {
             compilerOptions: { target: ts.ScriptTarget.ES2022 }
         }).outputText
@@ -517,5 +523,151 @@ for (const relative of [
         assert.equal(queryClient.getQueryData(['private']), undefined)
         assert.equal(auth.render().isAuthenticated, false)
         assert.deepEqual(navigations, [ROUTES.AUTH.LOGIN])
+    })
+}
+
+for (const [name, useAuthentication] of [
+    ['password', useLogin],
+    ['registration', useRegister]
+] as const) {
+    test(`${name} owned authentication preserves a current token handoff and configured success callback`, async (context) => {
+        context.mock.method(toast, 'success', () => 'fixture-notification')
+        let observed = 0
+        const generation = getSessionGeneration()
+        instance.defaults.adapter = async (config) => ({
+            config,
+            status: 200,
+            statusText: 'OK',
+            headers: {},
+            data: { response: { accessToken: 'owned-fixture-token' } }
+        })
+        const authentication = renderHook(() =>
+            useAuthentication({
+                captureOwnership: () => ({
+                    isCurrent: () => getSessionGeneration() === generation
+                }),
+                mutationFns: {
+                    onSuccess: () => {
+                        observed++
+                    }
+                }
+            })
+        )
+        await authentication.mutateAsync({ variables: credentials })
+        assert.equal(useSessionStore.getState().token, 'owned-fixture-token')
+        assert.equal(
+            observed,
+            1,
+            'its own token installation must not cancel the admitted success batch'
+        )
+    })
+
+    test(`${name} ownership invalidated before dispatch never reaches the adapter`, async () => {
+        let requests = 0
+        instance.defaults.adapter = async () => {
+            requests++
+            throw new Error('must not dispatch')
+        }
+        const authentication = renderHook(() =>
+            useAuthentication({ captureOwnership: () => ({ isCurrent: () => false }) })
+        )
+        const outcome = await authentication
+            .mutateAsync({ variables: credentials })
+            .catch((error: unknown) => error)
+        assert(axios.isCancel(outcome))
+        assert.equal(requests, 0)
+        assert.equal(useSessionStore.getState().token, '')
+    })
+
+    test(`${name} canceled UI cannot commit a late successful response or show global notices`, async (context) => {
+        const notices: string[] = []
+        context.mock.method(toast, 'success', () => {
+            notices.push('success')
+            return 'fixture'
+        })
+        context.mock.method(toast, 'danger', () => {
+            notices.push('error')
+            return 'fixture'
+        })
+        let active = true
+        let entered!: () => void
+        const started = new Promise<void>((resolve) => {
+            entered = resolve
+        })
+        let respond!: () => void
+        instance.defaults.adapter = async (config) => {
+            entered()
+            await new Promise<void>((resolve) => {
+                respond = resolve
+            })
+            return {
+                config,
+                status: 200,
+                statusText: 'OK',
+                headers: {},
+                data: { response: { accessToken: 'late-fixture-token' } }
+            }
+        }
+        const authentication = renderHook(() =>
+            useAuthentication({ captureOwnership: () => ({ isCurrent: () => active }) })
+        )
+        const outcome = authentication
+            .mutateAsync({ variables: credentials })
+            .catch((error: unknown) => error)
+        await started
+        active = false
+        respond()
+        assert(axios.isCancel(await outcome))
+        assert.equal(useSessionStore.getState().token, '')
+        assert.deepEqual(notices, [])
+    })
+
+    test(`${name} reused variables retain separate authentication owners for concurrent attempts`, async (context) => {
+        context.mock.method(toast, 'success', () => 'fixture-notification')
+        let currentAttempt = 1
+        const responders: (() => void)[] = []
+        let entered!: () => void
+        const started = new Promise<void>((resolve) => {
+            entered = resolve
+        })
+        let enteredFirst!: () => void
+        const firstStarted = new Promise<void>((resolve) => {
+            enteredFirst = resolve
+        })
+        instance.defaults.adapter = async (config) => {
+            await new Promise<void>((resolve) => {
+                responders.push(resolve)
+                if (responders.length === 1) enteredFirst()
+                if (responders.length === 2) entered()
+            })
+            return {
+                config,
+                status: 200,
+                statusText: 'OK',
+                headers: {},
+                data: { response: { accessToken: 'current-fixture-token' } }
+            }
+        }
+        const authentication = renderHook(() =>
+            useAuthentication({
+                captureOwnership: () => {
+                    const attempt = currentAttempt
+                    return { isCurrent: () => attempt === currentAttempt }
+                }
+            })
+        )
+        const reused = { variables: credentials }
+        const old = authentication.mutateAsync(reused).catch((error: unknown) => error)
+        // Let the first attempt enter transport before replacing it.
+        await firstStarted
+        currentAttempt++
+        const current = authentication.mutateAsync(reused)
+        await started
+        responders[0]()
+        assert(axios.isCancel(await old))
+        assert.equal(useSessionStore.getState().token, '')
+        responders[1]()
+        await current
+        assert.equal(useSessionStore.getState().token, 'current-fixture-token')
     })
 }

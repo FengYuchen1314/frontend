@@ -1,16 +1,37 @@
-import { BoxProps, createPolymorphicComponent, UnstyledButton } from '@mantine/core'
-import cx from 'clsx'
+import type { ComponentProps } from 'react'
 
-import classes from './HeaderControl.module.css'
+import { Button, Link } from '@heroui/react'
 
-export interface HeaderControlProps extends BoxProps {
-    children: React.ReactNode
+import { safeExternalUrl } from './header-controls.model'
+
+const controlClassName =
+    'inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-xl border border-border px-3 text-sm font-semibold shadow-sm transition-colors'
+
+export type HeaderControlProps = Omit<ComponentProps<typeof Button>, 'className'> & {
+    className?: string
 }
 
-function _HeaderControl({ className, ...others }: HeaderControlProps) {
-    return <UnstyledButton className={cx(classes.control, className)} {...others} />
+export function HeaderControl({ className = '', ...props }: HeaderControlProps) {
+    return <Button className={`${controlClassName} ${className}`} variant="secondary" {...props} />
 }
 
-export const HeaderControl = createPolymorphicComponent<'button', HeaderControlProps>(
-    _HeaderControl
-)
+export function HeaderLink({
+    href,
+    children,
+    className = '',
+    ...props
+}: Omit<ComponentProps<typeof Link>, 'className'> & { className?: string }) {
+    const safeHref = safeExternalUrl(href)
+    return (
+        <Link
+            className={`${controlClassName} ${className}`}
+            href={safeHref}
+            isDisabled={!safeHref}
+            rel="noopener noreferrer"
+            target="_blank"
+            {...props}
+        >
+            {children}
+        </Link>
+    )
+}

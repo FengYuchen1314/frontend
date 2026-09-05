@@ -1,15 +1,13 @@
 /* eslint-disable @stylistic/indent */
-import { Box, BoxProps, ElementProps } from '@mantine/core'
+import type { SVGProps } from 'react'
 
-interface LogoProps
-    extends ElementProps<'svg', keyof BoxProps>, Omit<BoxProps, 'children' | 'ref'> {
+interface LogoProps extends Omit<SVGProps<SVGSVGElement>, 'children' | 'ref'> {
     size?: number | string
 }
 
 export function SingboxLogo({ size = 20, style, ...props }: LogoProps) {
     return (
-        <Box
-            component="svg"
+        <svg
             fill="none"
             preserveAspectRatio="xMidYMid meet"
             style={{
@@ -31,6 +29,6 @@ export function SingboxLogo({ size = 20, style, ...props }: LogoProps) {
                 strokeLinejoin="round"
                 strokeWidth="3.5"
             />
-        </Box>
+        </svg>
     )
 }

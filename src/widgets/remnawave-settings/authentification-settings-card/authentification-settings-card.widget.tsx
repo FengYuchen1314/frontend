@@ -304,8 +304,8 @@ export const AuthentificationSettingsCardWidget = (props: IProps) => {
                     </Accordion.Control>
                     <Group gap="xs" justify="flex-end" pr="xs" wrap="nowrap">
                         <HelpActionIconShared
-                            actionIconProps={{
-                                size: 'input-xs'
+                            buttonProps={{
+                                size: 'sm'
                             }}
                             iconProps={{
                                 size: 20
@@ -414,8 +414,8 @@ export const AuthentificationSettingsCardWidget = (props: IProps) => {
                                 </Accordion.Control>
                                 <Group gap="xs" justify="flex-end" pr="xs" wrap="nowrap">
                                     <HelpActionIconShared
-                                        actionIconProps={{
-                                            size: 'input-xs'
+                                        buttonProps={{
+                                            size: 'sm'
                                         }}
                                         iconProps={{
                                             size: 20

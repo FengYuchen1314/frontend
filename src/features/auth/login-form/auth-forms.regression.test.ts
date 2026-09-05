@@ -263,6 +263,9 @@ test('the production RHF login workflow validates before dispatch and retains fi
         zodResolver,
         loginFormSchema,
         applyAuthFormErrors,
+        useRef,
+        useEffect: () => {},
+        getSessionGeneration: () => 0,
         useLogin: () => ({
             isPending: false,
             mutate: (request: { variables: unknown }) => calls.push(request)
@@ -276,6 +279,69 @@ test('the production RHF login workflow validates before dispatch and retains fi
     await model.submit()
     assert.deepEqual(calls, [{ variables: { username: 'fixture', password: 'existing-password' } }])
 })
+
+function loginSubmissionHarness() {
+    const calls: { variables: { username: string; password: string } }[] = []
+    let generation = 0
+    let cleanup = () => {}
+    const hook = compileFunction('./model/use-login-form.ts', 'useLoginForm', {
+        useForm,
+        zodResolver,
+        loginFormSchema,
+        applyAuthFormErrors,
+        useRef,
+        useEffect: (effect: () => () => void) => {
+            cleanup = effect()
+        },
+        getSessionGeneration: () => generation,
+        useLogin: () => ({
+            isPending: false,
+            mutate: (request: { variables: { username: string; password: string } }) =>
+                calls.push(request)
+        })
+    }) as typeof import('./model/use-login-form').useLoginForm
+    return {
+        model: renderHook(hook),
+        calls,
+        cleanup: () => cleanup(),
+        replaceSession: () => {
+            generation++
+        }
+    }
+}
+
+for (const kind of ['login', 'registration'] as const) {
+    for (const boundary of ['session', 'unmount', 'new-submission'] as const) {
+        test(`${kind} async validation cannot dispatch an old submit after ${boundary}`, async () => {
+            const h =
+                kind === 'login' ? loginSubmissionHarness() : registrationHarness(async () => {})
+            const credentials = (username: string) => {
+                if ('generatePassword' in h.model) {
+                    h.model.form.setValue('username', username)
+                    h.model.form.setValue('password', 'Fixture-Password-24-Characters-1')
+                    h.model.form.setValue('confirmPassword', 'Fixture-Password-24-Characters-1')
+                } else {
+                    h.model.form.setValue('username', username)
+                    h.model.form.setValue('password', 'Fixture-Password-24-Characters-1')
+                }
+            }
+            credentials('old-fixture')
+            const old = h.model.submit()
+            let current: Promise<void> | undefined
+            if (boundary === 'session') h.replaceSession()
+            if (boundary === 'unmount') h.cleanup()
+            if (boundary === 'new-submission') {
+                credentials('new-fixture')
+                current = h.model.submit()
+            }
+            await old
+            if (current) await current
+            assert.equal(h.calls.length, boundary === 'new-submission' ? 1 : 0)
+            if (boundary === 'new-submission')
+                assert.equal((h.calls[0].variables as { username: string }).username, 'new-fixture')
+        })
+    }
+}
 
 function registrationHarness(copy: (password: string) => Promise<void>) {
     const calls: { variables: unknown }[] = []

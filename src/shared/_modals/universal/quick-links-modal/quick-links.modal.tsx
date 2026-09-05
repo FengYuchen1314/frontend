@@ -1,40 +1,46 @@
+import type { QuickLinksContext, QuickLinksDraft } from './quick-links.model'
+import type { Dispatch, SetStateAction } from 'react'
+
 import NiceModal, { useModal } from '@ebay/nice-modal-react'
 import {
-    ActionIcon,
-    Group,
-    Menu,
-    ScrollArea,
-    SegmentedControl,
+    Button,
+    FieldError,
+    Input,
+    Label,
+    ListBox,
+    Modal,
+    Popover,
     Select,
-    Stack,
-    Text,
-    TextInput,
-    ThemeIcon
-} from '@mantine/core'
-import { ComponentType, useMemo, useState } from 'react'
+    Tabs,
+    TextField
+} from '@heroui/react'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { TbBolt, TbChevronDown, TbChevronUp, TbDeviceFloppy, TbPlus, TbTrash } from 'react-icons/tb'
-
-import { useNiceMantineModal } from '@shared/_modals/use-nice-modal'
-import { CompoundModalShared } from '@shared/ui/compound-modal/compound-modal.shared'
-import { EmptyPageLayout } from '@shared/ui/layouts/empty-page'
-import { BaseOverlayHeader } from '@shared/ui/overlays/base-overlay-header'
-import type {
-    IQuickLauncherRoute,
-    TQuickIconName,
-    TQuickLink,
-    TQuickModalId
-} from '@shared/ui/quick-launcher'
 import {
-    DEFAULT_QUICK_ICON,
+    TbBolt,
+    TbChevronDown,
+    TbChevronUp,
+    TbDeviceFloppy,
+    TbGripVertical,
+    TbPlus,
+    TbTrash
+} from 'react-icons/tb'
+
+import { HeroModalPresence, useHeroModal } from '@shared/_modals/use-hero-modal'
+import type { IQuickLauncherRoute, TQuickLink } from '@shared/ui/quick-launcher'
+import {
     isSafeExternalUrl,
+    MAX_QUICK_LABEL,
     MAX_QUICK_LINKS,
     QUICK_ICON_NAMES,
     QUICK_ICONS,
     QUICK_MODAL_IDS,
     QUICK_MODALS
 } from '@shared/ui/quick-launcher'
-import { SectionCard } from '@shared/ui/section-card'
+import {
+    isLauncherLinkAvailable,
+    quickLinkKey
+} from '@shared/ui/quick-launcher/quick-launcher.model'
 
 import {
     useExperimentalFeatures,
@@ -42,380 +48,424 @@ import {
     useViewPreferencesStoreActions
 } from '@entities/dashboard/view-preferences-store'
 
-const BODY_HEIGHT = 420
-
-type TAddKind = 'external' | 'modal' | 'route'
+import {
+    addQuickLink,
+    createQuickLinksDraft,
+    moveQuickLink,
+    pendingQuickLink,
+    removeQuickLink,
+    saveQuickLinksDraft,
+    searchQuickLinkRoutes,
+    switchQuickLinkKind,
+    syncQuickLinksDraft,
+    visibleQuickLinks
+} from './quick-links.model'
 
 interface IProps {
     routes: IQuickLauncherRoute[]
 }
 
-interface IRow {
-    description: string
-    Icon: ComponentType<{ size?: number }>
-    index: number
-    key: string
-    label: string
+export function QuickLinksEditor({
+    draft,
+    setDraft,
+    context,
+    onSave,
+    onCancel
+}: {
+    draft: QuickLinksDraft
+    setDraft: Dispatch<SetStateAction<QuickLinksDraft>>
+    context: QuickLinksContext
+    onSave: () => void
+    onCancel: () => void
+}) {
+    const { t } = useTranslation()
+    const dragSource = useRef<TQuickLink | null>(null)
+    const [iconsOpen, setIconsOpen] = useState(false)
+    const rows = visibleQuickLinks(draft, context)
+    const modalOptions = QUICK_MODAL_IDS.filter(
+        (id) =>
+            isLauncherLinkAvailable(
+                { kind: 'modal', id },
+                context.routes,
+                context.flags,
+                context.modals
+            ) && !draft.links.some((link) => link.kind === 'modal' && link.id === id)
+    )
+    const routeOptions = context.routes.filter(
+        (route) => !draft.links.some((link) => link.kind === 'route' && link.path === route.href)
+    )
+    const filteredRoutes = routeOptions.filter((route) =>
+        (route.name + ' ' + route.href)
+            .toLocaleLowerCase()
+            .includes(draft.routeSearch.toLocaleLowerCase())
+    )
+    const PreviewIcon = QUICK_ICONS[draft.icon]
+    const invalidUrl = draft.url.length > 0 && !isSafeExternalUrl(draft.url.trim())
+    const usedKeys = new Map<string, number>()
+    return (
+        <div className="flex min-h-0 flex-col gap-4">
+            <Tabs
+                selectedKey={draft.kind}
+                onSelectionChange={(key) => {
+                    if (key === 'modal' || key === 'route' || key === 'external') {
+                        setDraft((current) => switchQuickLinkKind(current, key))
+                        setIconsOpen(false)
+                    }
+                }}
+            >
+                <Tabs.ListContainer>
+                    <Tabs.List aria-label="Quick link type">
+                        <Tabs.Tab id="modal">
+                            Modals
+                            <Tabs.Indicator />
+                        </Tabs.Tab>
+                        <Tabs.Tab id="route">
+                            Routes
+                            <Tabs.Indicator />
+                        </Tabs.Tab>
+                        <Tabs.Tab id="external">
+                            External
+                            <Tabs.Indicator />
+                        </Tabs.Tab>
+                    </Tabs.List>
+                </Tabs.ListContainer>
+                <Tabs.Panel className="pt-3" id="modal">
+                    <Select
+                        value={draft.modalId}
+                        onChange={(value) =>
+                            setDraft((current) => ({
+                                ...current,
+                                modalId: QUICK_MODAL_IDS.find((id) => id === value) ?? null
+                            }))
+                        }
+                    >
+                        <Label>{t('common.action.select')}</Label>
+                        <Select.Trigger>
+                            <Select.Value />
+                            <Select.Indicator />
+                        </Select.Trigger>
+                        <Select.Popover>
+                            <ListBox aria-label="Modals">
+                                {modalOptions.map((id) => (
+                                    <ListBox.Item
+                                        id={id}
+                                        key={id}
+                                        textValue={t(context.modals[id].labelKey)}
+                                    >
+                                        {t(context.modals[id].labelKey)}
+                                        <ListBox.ItemIndicator />
+                                    </ListBox.Item>
+                                ))}
+                            </ListBox>
+                        </Select.Popover>
+                    </Select>
+                </Tabs.Panel>
+                <Tabs.Panel className="flex flex-col gap-3 pt-3" id="route">
+                    <TextField
+                        value={draft.routeSearch}
+                        onChange={(routeSearch) =>
+                            setDraft((current) => searchQuickLinkRoutes(current, routeSearch))
+                        }
+                    >
+                        <Label>{t('common.action.search')}</Label>
+                        <Input type="search" />
+                    </TextField>
+                    <Select
+                        value={draft.routePath}
+                        onChange={(value) =>
+                            setDraft((current) => ({
+                                ...current,
+                                routePath: typeof value === 'string' ? value : null
+                            }))
+                        }
+                    >
+                        <Label>Routes</Label>
+                        <Select.Trigger>
+                            <Select.Value />
+                            <Select.Indicator />
+                        </Select.Trigger>
+                        <Select.Popover>
+                            <ListBox aria-label="Routes">
+                                {filteredRoutes.map((route) => (
+                                    <ListBox.Item
+                                        id={route.href}
+                                        key={route.href}
+                                        textValue={route.name}
+                                    >
+                                        {route.name}
+                                        <ListBox.ItemIndicator />
+                                    </ListBox.Item>
+                                ))}
+                            </ListBox>
+                        </Select.Popover>
+                    </Select>
+                </Tabs.Panel>
+                <Tabs.Panel className="flex flex-col gap-3 pt-3" id="external">
+                    <div className="flex items-end gap-2">
+                        <Popover isOpen={iconsOpen} onOpenChange={setIconsOpen}>
+                            <Button
+                                aria-label="Choose quick link icon"
+                                isIconOnly
+                                variant="secondary"
+                            >
+                                <PreviewIcon size={18} />
+                            </Button>
+                            <Popover.Content>
+                                <Popover.Dialog aria-label="Quick link icons">
+                                    <div className="grid max-h-48 grid-cols-6 gap-1 overflow-y-auto p-2">
+                                        {QUICK_ICON_NAMES.map((name) => {
+                                            const Icon = QUICK_ICONS[name]
+                                            return (
+                                                <Button
+                                                    aria-label={name}
+                                                    aria-pressed={draft.icon === name}
+                                                    isIconOnly
+                                                    key={name}
+                                                    onPress={() => {
+                                                        setDraft((current) => ({
+                                                            ...current,
+                                                            icon: name
+                                                        }))
+                                                        setIconsOpen(false)
+                                                    }}
+                                                    size="sm"
+                                                    variant={
+                                                        draft.icon === name ? 'secondary' : 'ghost'
+                                                    }
+                                                >
+                                                    <Icon size={18} />
+                                                </Button>
+                                            )
+                                        })}
+                                    </div>
+                                </Popover.Dialog>
+                            </Popover.Content>
+                        </Popover>
+                        <TextField
+                            className="min-w-0 flex-1"
+                            value={draft.label}
+                            onChange={(label) => setDraft((current) => ({ ...current, label }))}
+                        >
+                            <Label>{t('common.field.name')}</Label>
+                            <Input maxLength={MAX_QUICK_LABEL} />
+                        </TextField>
+                    </div>
+                    <TextField
+                        isInvalid={invalidUrl}
+                        validationBehavior="aria"
+                        value={draft.url}
+                        onChange={(url) => setDraft((current) => ({ ...current, url }))}
+                    >
+                        <Label>HTTPS URL</Label>
+                        <Input placeholder="https://example.com" type="url" />
+                        <FieldError>
+                            Only https:// links without embedded credentials are allowed.
+                        </FieldError>
+                    </TextField>
+                </Tabs.Panel>
+            </Tabs>
+            <div className="flex items-center justify-between gap-2">
+                <p aria-live="polite" className="text-sm text-muted">
+                    {draft.links.length} / {MAX_QUICK_LINKS}
+                </p>
+                <Button
+                    isDisabled={!pendingQuickLink(draft, context)}
+                    onPress={() => setDraft((current) => addQuickLink(current, context))}
+                    size="sm"
+                    variant="secondary"
+                >
+                    <TbPlus size={18} />
+                    {t('common.action.add')}
+                </Button>
+            </div>
+            <ul
+                aria-label="Quick links"
+                className="flex max-h-64 min-h-20 flex-col gap-2 overflow-y-auto"
+            >
+                {rows.length === 0 && (
+                    <li className="flex justify-center rounded-xl border border-border p-6 text-muted">
+                        <TbBolt aria-label="No quick links" size={36} />
+                    </li>
+                )}
+                {rows.map(({ link, index }, rowIndex) => {
+                    const route =
+                        link.kind === 'route'
+                            ? context.routes.find((entry) => entry.href === link.path)
+                            : null
+                    const Icon =
+                        link.kind === 'modal'
+                            ? context.modals[link.id].Icon
+                            : link.kind === 'external'
+                              ? QUICK_ICONS[link.icon]
+                              : (route?.icon ?? TbBolt)
+                    const label =
+                        link.kind === 'modal'
+                            ? t(context.modals[link.id].labelKey)
+                            : link.kind === 'external'
+                              ? link.label
+                              : (route?.name ?? link.path)
+                    const description =
+                        link.kind === 'modal'
+                            ? 'Modals'
+                            : link.kind === 'external'
+                              ? link.url
+                              : link.path
+                    const identity = quickLinkKey(link)
+                    const occurrence = usedKeys.get(identity) ?? 0
+                    usedKeys.set(identity, occurrence + 1)
+                    return (
+                        <li
+                            className="flex items-center gap-2 rounded-xl border border-border p-2"
+                            key={identity + ':' + occurrence}
+                            onDragOver={(event) => {
+                                if (dragSource.current) {
+                                    event.preventDefault()
+                                    event.dataTransfer.dropEffect = 'move'
+                                }
+                            }}
+                            onDrop={(event) => {
+                                event.preventDefault()
+                                const source = dragSource.current
+                                dragSource.current = null
+                                if (!source) return
+                                setDraft((current) => {
+                                    const visible = visibleQuickLinks(current, context)
+                                    return moveQuickLink(
+                                        current,
+                                        visible.findIndex((row) => row.link === source),
+                                        visible.findIndex((row) => row.link === link),
+                                        context
+                                    )
+                                })
+                            }}
+                        >
+                            <button
+                                aria-label={'Drag ' + label}
+                                className="cursor-grab rounded p-1 text-muted focus-visible:outline-2 focus-visible:outline-accent"
+                                draggable
+                                onDragStart={(event) => {
+                                    dragSource.current = link
+                                    event.dataTransfer.effectAllowed = 'move'
+                                    event.dataTransfer.setData('text/plain', identity)
+                                }}
+                                onDragEnd={() => {
+                                    dragSource.current = null
+                                }}
+                                tabIndex={-1}
+                                type="button"
+                            >
+                                <TbGripVertical size={16} />
+                            </button>
+                            <Icon size={18} />
+                            <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-medium">{label}</p>
+                                <p className="truncate text-xs text-muted">{description}</p>
+                            </div>
+                            <Button
+                                aria-label={'Move up: ' + label}
+                                isDisabled={rowIndex === 0}
+                                isIconOnly
+                                onPress={() =>
+                                    setDraft((current) =>
+                                        moveQuickLink(current, rowIndex, rowIndex - 1, context)
+                                    )
+                                }
+                                size="sm"
+                                variant="ghost"
+                            >
+                                <TbChevronUp size={16} />
+                            </Button>
+                            <Button
+                                aria-label={'Move down: ' + label}
+                                isDisabled={rowIndex === rows.length - 1}
+                                isIconOnly
+                                onPress={() =>
+                                    setDraft((current) =>
+                                        moveQuickLink(current, rowIndex, rowIndex + 1, context)
+                                    )
+                                }
+                                size="sm"
+                                variant="ghost"
+                            >
+                                <TbChevronDown size={16} />
+                            </Button>
+                            <Button
+                                aria-label={t('common.action.delete') + ': ' + label}
+                                isIconOnly
+                                onPress={() =>
+                                    setDraft((current) => removeQuickLink(current, index))
+                                }
+                                size="sm"
+                                variant="ghost"
+                            >
+                                <TbTrash className="text-danger" size={16} />
+                            </Button>
+                        </li>
+                    )
+                })}
+            </ul>
+            {draft.error && (
+                <p className="text-sm text-danger" role="alert">
+                    {draft.error}
+                </p>
+            )}
+            <div className="flex justify-end gap-2">
+                <Button onPress={onCancel} variant="secondary">
+                    {t('common.action.cancel')}
+                </Button>
+                <Button onPress={onSave}>
+                    <TbDeviceFloppy size={18} />
+                    {t('common.action.save')}
+                </Button>
+            </div>
+        </div>
+    )
 }
 
-export const QuickLinksModalShared = NiceModal.create((props: IProps) => {
-    const { routes } = props
-
+export const QuickLinksModalShared = NiceModal.create(({ routes }: IProps) => {
     const { t } = useTranslation()
-    const modal = useModal()
-    const { modalProps, hide } = useNiceMantineModal({ modal })
-
+    const niceModal = useModal()
+    const modal = useHeroModal({ modal: niceModal })
     const storedLinks = useQuickLinks()
-    const experimental = useExperimentalFeatures()
+    const flags = useExperimentalFeatures()
     const { setQuickLinks } = useViewPreferencesStoreActions()
-
-    const [links, setLinks] = useState<TQuickLink[]>(storedLinks)
-    const [addKind, setAddKind] = useState<TAddKind>('modal')
-    const [modalId, setModalId] = useState<null | TQuickModalId>(null)
-    const [routePath, setRoutePath] = useState<null | string>(null)
-    const [externalLabel, setExternalLabel] = useState('')
-    const [externalUrl, setExternalUrl] = useState('')
-    const [externalIcon, setExternalIcon] = useState<TQuickIconName>(DEFAULT_QUICK_ICON)
-
-    const routeCatalog = useMemo(
-        () => new Map(routes.map((route) => [route.href, route])),
-        [routes]
+    const [state, setDraft] = useState(() =>
+        createQuickLinksDraft(storedLinks, modal.isOpen, niceModal.args)
     )
-
-    const isFull = links.length >= MAX_QUICK_LINKS
-
-    const modalOptions = useMemo(
-        () =>
-            QUICK_MODAL_IDS.filter((id) => {
-                const entry = QUICK_MODALS[id]
-                if (entry.experimental && !experimental[entry.experimental]) return false
-
-                return !links.some((link) => link.kind === 'modal' && link.id === id)
-            }).map((id) => ({ label: t(QUICK_MODALS[id].labelKey), value: id })),
-        [links, experimental, t]
-    )
-
-    const routeOptions = useMemo(
-        () =>
-            routes
-                .filter(
-                    (route) =>
-                        !links.some((link) => link.kind === 'route' && link.path === route.href)
-                )
-                .map((route) => ({ label: route.name, value: route.href })),
-        [routes, links]
-    )
-
-    const rows = useMemo<IRow[]>(() => {
-        const out: IRow[] = []
-
-        links.forEach((link, index) => {
-            if (link.kind === 'modal') {
-                const entry = QUICK_MODALS[link.id]
-                if (entry.experimental && !experimental[entry.experimental]) return
-
-                out.push({
-                    description: 'Modals',
-                    Icon: entry.Icon,
-                    index,
-                    key: `modal-${link.id}-${index}`,
-                    label: t(entry.labelKey)
-                })
-
-                return
-            }
-
-            if (link.kind === 'route') {
-                const entry = routeCatalog.get(link.path)
-
-                out.push({
-                    description: link.path,
-                    Icon: entry?.icon ?? TbBolt,
-                    index,
-                    key: `route-${link.path}`,
-                    label: entry?.name ?? link.path
-                })
-
-                return
-            }
-
-            out.push({
-                description: link.url,
-                Icon: QUICK_ICONS[link.icon],
-                index,
-                key: `external-${index}-${link.url}`,
-                label: link.label
-            })
-        })
-
-        return out
-    }, [links, routeCatalog, experimental, t])
-
-    const move = (row: number, delta: number) => {
-        const target = rows[row + delta]
-        if (!target) return
-
-        const next = [...links]
-        const [moved] = next.splice(rows[row].index, 1)
-        next.splice(target.index, 0, moved)
-
-        setLinks(next)
+    const draft = syncQuickLinksDraft(state, storedLinks, modal.isOpen, niceModal.args)
+    if (draft !== state) setDraft(draft)
+    const context = { routes, flags, modals: QUICK_MODALS }
+    const save = () => {
+        const lease = modal.capture()
+        if (!lease.isCurrent()) return
+        const result = saveQuickLinksDraft(draft, setQuickLinks, modal.close)
+        if (result !== draft) setDraft(result)
     }
-
-    const remove = (index: number) => setLinks(links.filter((_, i) => i !== index))
-
-    const switchKind = (next: TAddKind) => {
-        setAddKind(next)
-        setModalId(null)
-        setRoutePath(null)
-        setExternalLabel('')
-        setExternalUrl('')
-        setExternalIcon(DEFAULT_QUICK_ICON)
-    }
-
-    const isExternal = addKind === 'external'
-    const isUrlValid = externalUrl.length === 0 || isSafeExternalUrl(externalUrl)
-    const isDuplicateUrl = links.some(
-        (link) => link.kind === 'external' && link.url === externalUrl
-    )
-
-    const selectedModal = modalId ? QUICK_MODALS[modalId] : null
-    const selectedRoute = routePath ? routeCatalog.get(routePath) : null
-
-    const PreviewIcon = isExternal
-        ? QUICK_ICONS[externalIcon]
-        : (selectedModal?.Icon ?? selectedRoute?.icon ?? QUICK_ICONS[DEFAULT_QUICK_ICON])
-
-    const previewLabel = isExternal
-        ? externalLabel
-        : ((selectedModal ? t(selectedModal.labelKey) : selectedRoute?.name) ?? '')
-
-    const canAdd =
-        !isFull &&
-        (isExternal
-            ? externalLabel.trim().length > 0 && isSafeExternalUrl(externalUrl) && !isDuplicateUrl
-            : Boolean(addKind === 'modal' ? modalId : routePath))
-
-    const add = () => {
-        if (!canAdd) return
-
-        if (addKind === 'modal' && modalId) {
-            setLinks([...links, { id: modalId, kind: 'modal' }])
-            setModalId(null)
-
-            return
-        }
-
-        if (addKind === 'route' && routePath) {
-            setLinks([...links, { kind: 'route', path: routePath }])
-            setRoutePath(null)
-
-            return
-        }
-
-        setLinks([
-            ...links,
-            { icon: externalIcon, kind: 'external', label: externalLabel.trim(), url: externalUrl }
-        ])
-        setExternalLabel('')
-        setExternalUrl('')
-        setExternalIcon(DEFAULT_QUICK_ICON)
-    }
-
     return (
-        <CompoundModalShared
-            buttons={
-                <ActionIcon
-                    color="teal"
-                    onClick={() => {
-                        setQuickLinks(links)
-                        hide()
-                    }}
-                    size="lg"
-                    variant="soft"
-                >
-                    <TbDeviceFloppy size="20px" />
-                </ActionIcon>
-            }
-            modalProps={modalProps}
-            title={
-                <BaseOverlayHeader
-                    iconColor="cyan"
-                    IconComponent={TbBolt}
-                    iconVariant="soft"
-                    title={t('constants.quick-launcher')}
-                />
-            }
-        >
-            <Stack gap="md" h={BODY_HEIGHT}>
-                <SectionCard.Root>
-                    <SectionCard.Section>
-                        <Stack gap="sm">
-                            <SegmentedControl
-                                data={[
-                                    { label: 'Modals', value: 'modal' },
-                                    { label: 'Routes', value: 'route' },
-                                    { label: 'External', value: 'external' }
-                                ]}
-                                fullWidth
-                                onChange={(value) => switchKind(value as TAddKind)}
-                                value={addKind}
+        <Modal isOpen={modal.isOpen} onOpenChange={modal.onOpenChange}>
+            <Modal.Backdrop>
+                <HeroModalPresence onExitComplete={modal.afterClose} />
+                <Modal.Container scroll="inside" size="lg">
+                    <Modal.Dialog>
+                        <Modal.CloseTrigger />
+                        <Modal.Header>
+                            <Modal.Heading className="flex items-center gap-2">
+                                <TbBolt aria-hidden="true" />
+                                {t('constants.quick-launcher')}
+                            </Modal.Heading>
+                        </Modal.Header>
+                        <Modal.Body>
+                            <QuickLinksEditor
+                                context={context}
+                                draft={draft}
+                                onCancel={modal.close}
+                                onSave={save}
+                                setDraft={setDraft}
                             />
-
-                            <Group gap="xs" wrap="nowrap">
-                                <Menu position="bottom-start" shadow="md" width={272}>
-                                    <Menu.Target>
-                                        <ActionIcon
-                                            color="gray"
-                                            disabled={!isExternal}
-                                            size="input-sm"
-                                            variant="default"
-                                        >
-                                            <PreviewIcon size={18} />
-                                        </ActionIcon>
-                                    </Menu.Target>
-
-                                    <Menu.Dropdown>
-                                        <ScrollArea h={148} scrollbars="y" type="auto">
-                                            <Group gap={4} pr={6}>
-                                                {QUICK_ICON_NAMES.map((name) => {
-                                                    const Icon = QUICK_ICONS[name]
-                                                    const isPicked = externalIcon === name
-
-                                                    return (
-                                                        <ActionIcon
-                                                            color={isPicked ? 'cyan' : 'gray'}
-                                                            key={name}
-                                                            onClick={() => setExternalIcon(name)}
-                                                            size="lg"
-                                                            variant={isPicked ? 'soft' : 'subtle'}
-                                                        >
-                                                            <Icon size={18} />
-                                                        </ActionIcon>
-                                                    )
-                                                })}
-                                            </Group>
-                                        </ScrollArea>
-                                    </Menu.Dropdown>
-                                </Menu>
-
-                                <TextInput
-                                    disabled={!isExternal}
-                                    onChange={(event) =>
-                                        setExternalLabel(event.currentTarget.value)
-                                    }
-                                    placeholder={t('common.field.name')}
-                                    style={{ flex: 1 }}
-                                    value={previewLabel}
-                                />
-                            </Group>
-
-                            <Group align="flex-start" gap="xs" wrap="nowrap">
-                                {isExternal ? (
-                                    <TextInput
-                                        error={
-                                            isUrlValid ? null : 'Only https:// links are allowed.'
-                                        }
-                                        onChange={(event) =>
-                                            setExternalUrl(event.currentTarget.value)
-                                        }
-                                        placeholder="https://example.com"
-                                        style={{ flex: 1 }}
-                                        value={externalUrl}
-                                    />
-                                ) : (
-                                    <Select
-                                        data={addKind === 'modal' ? modalOptions : routeOptions}
-                                        onChange={(value) =>
-                                            addKind === 'modal'
-                                                ? setModalId(
-                                                      QUICK_MODAL_IDS.find((id) => id === value) ??
-                                                          null
-                                                  )
-                                                : setRoutePath(value)
-                                        }
-                                        placeholder={t('common.action.select')}
-                                        searchable={addKind === 'route'}
-                                        style={{ flex: 1 }}
-                                        value={addKind === 'modal' ? modalId : routePath}
-                                    />
-                                )}
-
-                                <ActionIcon
-                                    color="teal"
-                                    disabled={!canAdd}
-                                    onClick={add}
-                                    size="input-sm"
-                                    variant="soft"
-                                >
-                                    <TbPlus size={18} />
-                                </ActionIcon>
-                            </Group>
-
-                            {isFull ? (
-                                <Text c="dimmed" size="xs" ta="right">
-                                    {MAX_QUICK_LINKS} / {MAX_QUICK_LINKS}
-                                </Text>
-                            ) : null}
-                        </Stack>
-                    </SectionCard.Section>
-                </SectionCard.Root>
-
-                <ScrollArea scrollbars="y" style={{ flex: 1, minHeight: 0 }} type="auto">
-                    {rows.length === 0 ? (
-                        <EmptyPageLayout icon={<TbBolt size={48} />} />
-                    ) : (
-                        <SectionCard.Root gap="sm" p="sm">
-                            {rows.map((row, index) => (
-                                <SectionCard.Section key={row.key}>
-                                    <Group gap="xs" wrap="nowrap">
-                                        <ThemeIcon color="gray" size="lg" variant="light">
-                                            <row.Icon size={18} />
-                                        </ThemeIcon>
-
-                                        <Stack gap={0} style={{ flex: 1, minWidth: 0 }}>
-                                            <Text fw={500} size="sm" truncate>
-                                                {row.label}
-                                            </Text>
-                                            <Text c="dimmed" size="xs" truncate>
-                                                {row.description}
-                                            </Text>
-                                        </Stack>
-
-                                        <ActionIcon.Group>
-                                            <ActionIcon
-                                                color="gray"
-                                                disabled={index === 0}
-                                                onClick={() => move(index, -1)}
-                                                variant="default"
-                                            >
-                                                <TbChevronUp size={16} />
-                                            </ActionIcon>
-
-                                            <ActionIcon
-                                                color="gray"
-                                                disabled={index === rows.length - 1}
-                                                onClick={() => move(index, 1)}
-                                                variant="default"
-                                            >
-                                                <TbChevronDown size={16} />
-                                            </ActionIcon>
-                                        </ActionIcon.Group>
-
-                                        <ActionIcon
-                                            color="red"
-                                            onClick={() => remove(row.index)}
-                                            variant="subtle"
-                                        >
-                                            <TbTrash size={16} />
-                                        </ActionIcon>
-                                    </Group>
-                                </SectionCard.Section>
-                            ))}
-                        </SectionCard.Root>
-                    )}
-                </ScrollArea>
-            </Stack>
-        </CompoundModalShared>
+                        </Modal.Body>
+                    </Modal.Dialog>
+                </Modal.Container>
+            </Modal.Backdrop>
+        </Modal>
     )
 })

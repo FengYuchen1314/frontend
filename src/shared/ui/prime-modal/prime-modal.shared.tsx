@@ -1,4 +1,4 @@
-import { Button, Group, Stack, Text, Title } from '@mantine/core'
+import { Link } from '@heroui/react'
 import {
     IconCrownFilled,
     IconHeadset,
@@ -39,53 +39,43 @@ export function PrimeModalContent() {
     const { t } = useTranslation()
 
     return (
-        <Stack gap="xl" pb={4}>
+        <div className="flex flex-col gap-6 pb-1">
             <div className={classes.hero}>
                 <div className={classes.crownRing}>
                     <IconCrownFilled size={36} />
                 </div>
 
-                <Title className={classes.title} mt={4} order={2}>
-                    RW Prime
-                </Title>
-                <Text c="dimmed" maw={380} mt={8} size="sm">
+                <h2 className={`${classes.title} mt-1 text-2xl`}>RW Prime</h2>
+                <p className="mt-2 max-w-[380px] text-sm text-muted">
                     {t('prime-modal.shared.description')}
-                </Text>
+                </p>
             </div>
 
-            <Stack gap="md">
+            <div className="flex flex-col gap-4">
                 {FEATURES.map((feature) => (
-                    <Group align="flex-start" gap="md" key={feature.titleKey} wrap="nowrap">
+                    <div className="flex items-start gap-4" key={feature.titleKey}>
                         <div className={classes.featureIcon}>
                             <feature.icon size={20} />
                         </div>
                         <div>
-                            <Text fw={600} size="sm">
-                                {t(feature.titleKey)}
-                            </Text>
-                            <Text c="dimmed" size="xs">
-                                {t(feature.descriptionKey)}
-                            </Text>
+                            <h3 className="text-sm font-semibold">{t(feature.titleKey)}</h3>
+                            <p className="text-xs text-muted">{t(feature.descriptionKey)}</p>
                         </div>
-                    </Group>
+                    </div>
                 ))}
-            </Stack>
+            </div>
 
-            <Stack gap={10}>
-                <Button
-                    className={classes.joinButton}
-                    component="a"
-                    fullWidth
+            <div>
+                <Link
+                    className={`${classes.joinButton} flex w-full items-center justify-center gap-2 rounded-xl p-3`}
                     href={PRIME_LINK}
-                    leftSection={<IconCrownFilled size={18} />}
-                    radius="md"
                     rel="noopener noreferrer"
-                    size="md"
                     target="_blank"
                 >
+                    <IconCrownFilled aria-hidden size={18} />
                     {t('prime-modal.shared.join-button')}
-                </Button>
-            </Stack>
-        </Stack>
+                </Link>
+            </div>
+        </div>
     )
 }

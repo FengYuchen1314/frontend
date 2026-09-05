@@ -3,6 +3,28 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Native overlays must remain above the legacy dialogs until their migration is complete. */
+.modal__backdrop,
+.drawer__backdrop,
+.alert-dialog__backdrop {
+    z-index: 300;
+}
+
+.dropdown__popover,
+.popover,
+.select__popover,
+.autocomplete__popover,
+.combo-box__popover,
+.date-picker__popover,
+.date-range-picker__popover,
+.color-picker__popover {
+    z-index: 310;
+}
+
+.tooltip {
+    z-index: 320;
+}
+
 @theme inline {
     --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
 }

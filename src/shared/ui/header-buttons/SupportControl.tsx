@@ -1,18 +1,17 @@
 import { TbHeartFilled } from 'react-icons/tb'
 
-import { HeaderControl } from './HeaderControl'
-import classes from './SupportControl.module.css'
+import { HeaderLink } from './HeaderControl'
 
 export function SupportControl() {
     return (
-        <HeaderControl
-            className={classes.support}
-            component="a"
+        <HeaderLink
+            aria-label="Support Remnawave"
+            className="text-danger"
             href="https://docs.rw/docs/donate"
             rel="noopener noreferrer"
             target="_blank"
         >
-            <TbHeartFilled />
-        </HeaderControl>
+            <TbHeartFilled aria-hidden size={22} />
+        </HeaderLink>
     )
 }

@@ -1,14 +1,12 @@
-import { Box, BoxProps, ElementProps } from '@mantine/core'
+import type { SVGProps } from 'react'
 
-interface LogoProps
-    extends ElementProps<'svg', keyof BoxProps>, Omit<BoxProps, 'children' | 'ref'> {
+interface LogoProps extends Omit<SVGProps<SVGSVGElement>, 'children' | 'ref'> {
     size?: number | string
 }
 
 export function MihomoLogo({ size = 20, style, ...props }: LogoProps) {
     return (
-        <Box
-            component="svg"
+        <svg
             fill="currentColor"
             preserveAspectRatio="xMidYMid meet"
             style={{
@@ -33,6 +31,6 @@ export function MihomoLogo({ size = 20, style, ...props }: LogoProps) {
                 d="M17.89 26.569a.452.452 0 0 1-.78 0l-.651-1.12a.448.448 0 0 1 .39-.672h1.301c.347 0 .564.373.39.672l-.65 1.12ZM2.5 26.121c0-.289.235-.523.526-.523h7.212c.29 0 .526.234.526.523a.524.524 0 0 1-.526.523H3.026a.524.524 0 0 1-.526-.523ZM2.901 31.152a.522.522 0 0 1 .32-.667l6.796-2.397a.522.522 0 1 1 .352.985L3.573 31.47a.527.527 0 0 1-.672-.318ZM32.5 26.121a.524.524 0 0 0-.526-.523h-7.212a.524.524 0 0 0-.526.523c0 .289.236.523.526.523h7.212c.29 0 .526-.234.526-.523ZM32.099 31.152a.522.522 0 0 0-.32-.667l-6.796-2.397a.522.522 0 1 0-.352.985l6.796 2.397a.527.527 0 0 0 .672-.318Z"
                 fill="currentColor"
             />
-        </Box>
+        </svg>
     )
 }

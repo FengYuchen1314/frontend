@@ -1,12 +1,15 @@
-import { useMediaQuery } from '@mantine/hooks'
+import { RouterProvider as AriaRouterProvider } from 'react-aria-components'
+import { useHref, useNavigate } from 'react-router'
 
 import { useIsMobile } from '@shared/hooks'
+import { useMediaQuery } from '@shared/hooks/use-media-query'
 import { HeaderControls } from '@shared/ui/header-buttons'
 import { QuickLauncher } from '@shared/ui/quick-launcher'
 
 import { useIsLoadingRemnawaveUpdates, useRemnawaveInfo } from '@entities/dashboard/updates-store'
 import { useExperimentalFeature } from '@entities/dashboard/view-preferences-store'
 
+import { resolveDashboardLayout } from './layout-model'
 import { DASHBOARD_LINKS } from './layout-shared'
 import { CompactLayout } from './layout-variants/compact.layout'
 import { MobileLayout } from './layout-variants/mobile.layout'
@@ -20,9 +23,9 @@ export function MainLayout() {
 
     const isMobile = useIsMobile()
 
-    const isHiResDesktop = useMediaQuery(`(min-width: 2048px)`, undefined, {
-        getInitialValueInEffect: false
-    })
+    const isHiResDesktop = useMediaQuery('(min-width: 2048px)')
+    const layout = resolveDashboardLayout(isMobile, isLegacyLayoutStyle, isHiResDesktop)
+    const navigate = useNavigate()
 
     const remnawaveInfo = useRemnawaveInfo()
     const isLoadingUpdates = useIsLoadingRemnawaveUpdates()
@@ -41,25 +44,21 @@ export function MainLayout() {
         />
     )
 
-    if (isMobile) {
-        return (
-            <MobileLayout
-                headerControls={headerControls}
-                isSocialButtons={isMobile}
-                isLoadingUpdates={isLoadingUpdates}
-                remnawaveInfo={remnawaveInfo}
-            />
-        )
-    }
-
     return (
-        <>
-            {isLegacyLayoutStyle ? (
+        <AriaRouterProvider navigate={navigate} useHref={useHref}>
+            {layout === 'mobile' ? (
+                <MobileLayout
+                    headerControls={headerControls}
+                    isSocialButtons
+                    isLoadingUpdates={isLoadingUpdates}
+                    remnawaveInfo={remnawaveInfo}
+                />
+            ) : layout === 'sidebar' ? (
                 <SidebarLayout headerControls={headerControls} />
             ) : (
                 <CompactLayout headerControls={headerControls} isHiResDesktop={isHiResDesktop} />
             )}
-            <QuickLauncher routes={launcherRoutes} />
-        </>
+            {!isMobile && <QuickLauncher routes={launcherRoutes} />}
+        </AriaRouterProvider>
     )
 }
