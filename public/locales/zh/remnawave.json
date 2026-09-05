@@ -1160,7 +1160,13 @@
       "profile-name": "配置文件名称",
       "enter-profile-name": "输入配置文件名称",
       "managed-protocol": "受管协议模板",
-      "managed-protocol-description": "此处仅显示已支持的受管创建模板；导入的配置和现有配置仍可继续编辑。"
+      "managed-protocol-description": "此处仅显示已支持的受管创建模板；导入的配置和现有配置仍可继续编辑。",
+      "anytls-help": "仅用于公网直连服务器。面板管理加密 AnyTLS 的账号和证书，外层使用 ShadowTLS v3。请填写不使用 Cloudflare CDN 的伪装域名及其一个公网 IP；Agent 会检查实时 DNS 和 TLS，通过后才接入流量。这不代表该域名已通过域名池验证。同一服务器各监听必须使用不同的 SNI 和两个不冲突的内部端口；客户端统一连接 443。导入及现有配置仍可编辑。",
+      "anytls-sni": "伪装域名（SNI）",
+      "anytls-address": "伪装目标 IP（不是 Agent IP）",
+      "anytls-camouflage-port": "伪装目标 TLS 端口",
+      "anytls-wrapper-port": "ShadowTLS 内部监听端口",
+      "anytls-inner-port": "加密 AnyTLS 内部端口"
     }
   },
   "restart-node-button": {

@@ -1160,7 +1160,13 @@
       "profile-name": "Profile name",
       "enter-profile-name": "Enter profile name",
       "managed-protocol": "Managed protocol preset",
-      "managed-protocol-description": "Only supported managed creation presets are shown. Imported and existing configurations remain editable."
+      "managed-protocol-description": "Only supported managed creation presets are shown. Imported and existing configurations remain editable.",
+      "anytls-help": "Public-direct servers only. The panel manages encrypted AnyTLS credentials and certificates, with ShadowTLS v3 outside. Enter a non-Cloudflare-CDN camouflage domain and one of its public IPs; the Agent checks live DNS and TLS before admitting traffic. This is not a verified domain-pool selection. Each listener on the same server needs a unique SNI and two distinct private ports. Clients use shared port 443. Imported and existing profiles remain editable.",
+      "anytls-sni": "Camouflage domain (SNI)",
+      "anytls-address": "Camouflage target IP (not the Agent IP)",
+      "anytls-camouflage-port": "Camouflage TLS port",
+      "anytls-wrapper-port": "Private ShadowTLS listener port",
+      "anytls-inner-port": "Private encrypted AnyTLS port"
     }
   },
   "restart-node-button": {

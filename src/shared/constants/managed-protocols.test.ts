@@ -4,19 +4,88 @@ import { describe, it } from 'node:test'
 
 import {
     createManagedProtocolConfig,
+    getManagedAnyTlsPresetError,
+    getManagedProtocolCreationPreset,
     getManagedProtocolCreationPresetsForServerType,
     isManagedProtocolCreationInboundForServerType,
     shouldRestrictNodeCreationToManagedProtocols
 } from './managed-protocols.ts'
 
 describe('managed protocol presets', () => {
-    it('allows public direct servers to use VLESS or explicitly warned SOCKS5', () => {
+    it('allows public direct servers to use VLESS, encrypted AnyTLS or explicitly warned SOCKS5', () => {
         assert.deepEqual(
             getManagedProtocolCreationPresetsForServerType(SERVER_TYPES.PUBLIC_DIRECT).map(
                 ({ id }) => id
             ),
-            ['vless-reality-vision', 'vless-xhttp-reality-xmux', 'socks5-password']
+            [
+                'vless-reality-vision',
+                'vless-xhttp-reality-xmux',
+                'socks5-password',
+                'anytls-shadowtls'
+            ]
         )
+    })
+
+    it('creates strict encrypted AnyTLS extensions without identities or raw Xray AnyTLS inbounds', () => {
+        const options = {
+            wrapperPort: 14443,
+            innerPort: 16001,
+            camouflage: { serverName: 'fixture.example.com', address: '192.0.2.50', port: 443 }
+        }
+        assert.equal(getManagedAnyTlsPresetError(options), null)
+        const config = createManagedProtocolConfig('anytls-shadowtls', options) as {
+            inbounds: unknown[]
+            xboardAnyTls: { version: number; listeners: Array<typeof options & { tag: string }> }
+        }
+        assert.deepEqual(config.inbounds, [])
+        assert.equal(config.xboardAnyTls.version, 1)
+        assert.equal(config.xboardAnyTls.listeners.length, 1)
+        const listener = config.xboardAnyTls.listeners[0]
+        assert.match(listener.tag, /^ANYTLS_SHADOWTLS_[a-f0-9]{16}$/)
+        assert.deepEqual(listener, { ...options, tag: listener.tag })
+        const inbound = {
+            tag: listener.tag,
+            type: 'anytls',
+            network: 'tcp',
+            security: 'tls',
+            port: 443,
+            rawInbound: { tag: listener.tag, protocol: 'anytls', settings: listener }
+        } as never
+        assert.equal(getManagedProtocolCreationPreset(inbound)?.id, 'anytls-shadowtls')
+        assert.equal(
+            isManagedProtocolCreationInboundForServerType(inbound, SERVER_TYPES.PUBLIC_DIRECT),
+            true
+        )
+        assert.equal(
+            isManagedProtocolCreationInboundForServerType(inbound, SERVER_TYPES.LEASED_LINE),
+            false
+        )
+        assert.equal(
+            isManagedProtocolCreationInboundForServerType(inbound, SERVER_TYPES.BROADBAND_LANDING),
+            false
+        )
+        assert(getManagedAnyTlsPresetError({ ...options, innerPort: options.wrapperPort }))
+        assert(getManagedAnyTlsPresetError({ ...options, wrapperPort: 443 }))
+        assert(
+            getManagedAnyTlsPresetError({
+                ...options,
+                camouflage: { ...options.camouflage, address: '' }
+            })
+        )
+        assert.throws(() => createManagedProtocolConfig('anytls-shadowtls'))
+        for (const patch of [{ users: [] }, { tls: { insecure: true } }, { tag: 'OTHER' }]) {
+            assert.equal(
+                getManagedProtocolCreationPreset({
+                    ...(inbound as object),
+                    rawInbound: {
+                        tag: listener.tag,
+                        protocol: 'anytls',
+                        settings: { ...listener, ...patch }
+                    }
+                } as never),
+                null
+            )
+        }
     })
 
     it('limits home broadband landing servers to SOCKS5', () => {

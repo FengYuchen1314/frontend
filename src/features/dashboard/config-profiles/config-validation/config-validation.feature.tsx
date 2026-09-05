@@ -6,7 +6,16 @@ import dayjs from 'dayjs'
 import { RefObject } from 'react'
 import { z } from 'zod'
 
-const PROTECTED_ROOT_KEYS = new Set(['api', 'inbounds', 'metrics', 'snippets', 'stats'])
+import { prepareManagedXrayValidation } from '@shared/utils/managed-xray-validation'
+
+const PROTECTED_ROOT_KEYS = new Set([
+    'api',
+    'inbounds',
+    'metrics',
+    'snippets',
+    'stats',
+    'xboardAnyTls'
+])
 
 const MieruProfileConfigSchema = z
     .object({
@@ -169,6 +178,8 @@ export const ConfigValidationFeature = {
                 return
             }
 
+            const prepared = prepareManagedXrayValidation(clonedCurrentValue)
+            clonedCurrentValue = prepared.nativeConfig
             replaceSnippetsInRoot(clonedCurrentValue, snippetsMap)
 
             if (clonedCurrentValue.outbounds) {
@@ -186,7 +197,12 @@ export const ConfigValidationFeature = {
             const validationResult = window.XrayParseConfig(JSON.stringify(clonedCurrentValue))
 
             setResult(
-                `${dayjs().format('HH:mm:ss')} | ${validationResult || 'Xray config is valid.'}`
+                `${dayjs().format('HH:mm:ss')} | ${
+                    validationResult ||
+                    (prepared.hasAnyTls
+                        ? 'Xray + encrypted AnyTLS config is structurally valid. Agent checks live camouflage.'
+                        : 'Xray config is valid.')
+                }`
             )
             setIsConfigValid(!validationResult)
         } catch (err: unknown) {

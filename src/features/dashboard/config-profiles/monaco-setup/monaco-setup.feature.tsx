@@ -1,4 +1,5 @@
 import {
+    AnyTlsProfileExtensionSchema,
     GetSharedListsCommand,
     GetSnippetsCommand,
     HostMapperSchema,
@@ -9,6 +10,7 @@ import { NodePluginEditorSchema, SharedListConfigSchema } from '@remnawave/node-
 import axios from 'axios'
 import consola from 'consola'
 import { app } from 'src/config'
+import { z } from 'zod'
 
 import { registerJsonSchema } from '@shared/utils/monaco/json-schema-registry'
 
@@ -25,7 +27,14 @@ interface IXraySchema {
 }
 
 const DEFINITIONS_REF_PREFIX = '#/definitions/'
-const PROTECTED_ROOT_KEYS = new Set(['api', 'inbounds', 'metrics', 'snippets', 'stats'])
+const PROTECTED_ROOT_KEYS = new Set([
+    'api',
+    'inbounds',
+    'metrics',
+    'snippets',
+    'stats',
+    'xboardAnyTls'
+])
 
 const CUSTOM_CORE_SCHEMA = {
     title: 'Remnawave Custom Core',
@@ -252,6 +261,13 @@ export const MonacoSetupFeature = {
             )
 
             const rootNode = resolveRootNode(schema)
+
+            injectProperty(rootNode, 'xboardAnyTls', {
+                ...z.toJSONSchema(AnyTlsProfileExtensionSchema, { target: 'draft-7', io: 'input' }),
+                title: 'Encrypted AnyTLS + ShadowTLS',
+                description:
+                    'Public-direct shared-443 listeners. The panel supplies subscriber credentials and TLS identities. Cloudflare CDN camouflage is forbidden and is checked by the Agent.'
+            })
 
             if (injectProperty(rootNode, 'snippets', rootSnippetsSchema) === 0) {
                 notInjected.push('config root')

@@ -66,10 +66,15 @@ jobs:
 
       - name: Use the fork Backend contract
         shell: bash
+        env:
+          BACKEND_CONTRACT_COMMIT: 2b2cebc4d86441405710cb39705c61bbbc7b55c4
         run: |
-          git clone --depth 1 --branch xboard-dev \
-            https://github.com/FengYuchen1314/backend.git \
-            "$RUNNER_TEMP/xboard-backend"
+          git init "$RUNNER_TEMP/xboard-backend"
+          git -C "$RUNNER_TEMP/xboard-backend" remote add origin \
+            https://github.com/FengYuchen1314/backend.git
+          git -C "$RUNNER_TEMP/xboard-backend" fetch --depth 1 origin "$BACKEND_CONTRACT_COMMIT"
+          git -C "$RUNNER_TEMP/xboard-backend" checkout --detach FETCH_HEAD
+          test "$(git -C "$RUNNER_TEMP/xboard-backend" rev-parse HEAD)" = "$BACKEND_CONTRACT_COMMIT"
           npm install \
             --prefix "$RUNNER_TEMP/xboard-backend/libs/contract" \
             --no-audit \
@@ -87,6 +92,14 @@ jobs:
             --no-package-lock \
             --no-save \
             "$RUNNER_TEMP/$contract_tarball"
+
+      - name: Upload the Actions-built pinned contract for local type checking
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pinned-backend-contract
+          path: ${{ runner.temp }}/remnawave-backend-contract-*.tgz
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Check changed-file formatting
         shell: bash

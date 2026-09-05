@@ -1,4 +1,4 @@
-import { Stack, TextInput, Group, Button, Text, Select } from '@mantine/core'
+import { Stack, TextInput, Group, Button, Text, Select, NumberInput, Alert } from '@mantine/core'
 import { useField } from '@mantine/form'
 import { CreateConfigProfileCommand } from '@remnawave/backend-contract'
 import { t } from 'i18next'
@@ -11,6 +11,7 @@ import { QueryKeys } from '@shared/api/hooks/keys-factory'
 import {
     createManagedProtocolConfig,
     DEFAULT_MANAGED_PROTOCOL_CREATION_PRESET,
+    getManagedAnyTlsPresetError,
     MANAGED_PROTOCOL_CREATION_WHITELIST,
     ManagedProtocolCreationPresetId
 } from '@shared/constants'
@@ -25,6 +26,22 @@ export const CreateConfigProfileContent = (props: IProps) => {
     const { onClose, navigate } = props
     const [managedProtocolPreset, setManagedProtocolPreset] =
         useState<ManagedProtocolCreationPresetId>(DEFAULT_MANAGED_PROTOCOL_CREATION_PRESET)
+    const [serverName, setServerName] = useState('')
+    const [address, setAddress] = useState('')
+    const [camouflagePort, setCamouflagePort] = useState<string | number>(443)
+    const [wrapperPort, setWrapperPort] = useState<string | number>(14443)
+    const [innerPort, setInnerPort] = useState<string | number>(16001)
+    const isAnyTls = managedProtocolPreset === 'anytls-shadowtls'
+    const anyTlsOptions = {
+        wrapperPort: Number(wrapperPort),
+        innerPort: Number(innerPort),
+        camouflage: {
+            serverName: serverName.trim(),
+            address: address.trim(),
+            port: Number(camouflagePort)
+        }
+    }
+    const anyTlsError = isAnyTls ? getManagedAnyTlsPresetError(anyTlsOptions) : null
 
     const handleUpdate = async () => {
         await queryClient.refetchQueries({
@@ -61,10 +78,11 @@ export const CreateConfigProfileContent = (props: IProps) => {
         <form
             onSubmit={(e) => {
                 e.preventDefault()
+                if (anyTlsError) return
                 createConfigProfile({
                     variables: {
                         name: nameField.getValue(),
-                        config: createManagedProtocolConfig(managedProtocolPreset)
+                        config: createManagedProtocolConfig(managedProtocolPreset, anyTlsOptions)
                     }
                 })
             }}
@@ -107,12 +125,70 @@ export const CreateConfigProfileContent = (props: IProps) => {
                     }}
                     value={managedProtocolPreset}
                 />
+                {isAnyTls && (
+                    <Stack gap="sm">
+                        <Alert color="blue">
+                            {t('config-profiles-header-action-buttons.feature.anytls-help')}
+                        </Alert>
+                        <TextInput
+                            label={t('config-profiles-header-action-buttons.feature.anytls-sni')}
+                            onChange={(event) => setServerName(event.currentTarget.value)}
+                            required
+                            value={serverName}
+                        />
+                        <TextInput
+                            label={t(
+                                'config-profiles-header-action-buttons.feature.anytls-address'
+                            )}
+                            onChange={(event) => setAddress(event.currentTarget.value)}
+                            required
+                            value={address}
+                        />
+                        <NumberInput
+                            label={t(
+                                'config-profiles-header-action-buttons.feature.anytls-camouflage-port'
+                            )}
+                            max={65535}
+                            min={1}
+                            onChange={setCamouflagePort}
+                            required
+                            value={camouflagePort}
+                        />
+                        <Group grow>
+                            <NumberInput
+                                label={t(
+                                    'config-profiles-header-action-buttons.feature.anytls-wrapper-port'
+                                )}
+                                max={65535}
+                                min={1024}
+                                onChange={setWrapperPort}
+                                required
+                                value={wrapperPort}
+                            />
+                            <NumberInput
+                                label={t(
+                                    'config-profiles-header-action-buttons.feature.anytls-inner-port'
+                                )}
+                                max={65535}
+                                min={1024}
+                                onChange={setInnerPort}
+                                required
+                                value={innerPort}
+                            />
+                        </Group>
+                        {anyTlsError && (serverName || address) && (
+                            <Text c="red" size="xs">
+                                {anyTlsError}
+                            </Text>
+                        )}
+                    </Stack>
+                )}
                 <Group justify="flex-end">
                     <Button color="gray" onClick={onClose} variant="light">
                         {t('common.action.cancel')}
                     </Button>
 
-                    <Button color="teal" loading={isPending} type="submit">
+                    <Button color="teal" disabled={!!anyTlsError} loading={isPending} type="submit">
                         {t('common.action.create')}
                     </Button>
                 </Group>

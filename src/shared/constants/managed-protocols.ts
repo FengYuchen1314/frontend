@@ -1,4 +1,5 @@
 import {
+    AnyTlsProfileExtensionSchema,
     NODE_CREATION_MODES,
     SERVER_TYPES,
     type GetConfigProfilesCommand,
@@ -35,6 +36,12 @@ export const MANAGED_PROTOCOL_CREATION_WHITELIST = [
         label: 'Mieru (TCP)',
         badgeLabel: 'Mieru · TCP',
         serverTypes: [SERVER_TYPES.LEASED_LINE]
+    },
+    {
+        id: 'anytls-shadowtls',
+        label: 'AnyTLS + ShadowTLS (TLS)',
+        badgeLabel: 'AnyTLS · ShadowTLS',
+        serverTypes: [SERVER_TYPES.PUBLIC_DIRECT]
     }
 ] as const
 
@@ -95,6 +102,21 @@ export const getManagedProtocolCreationPreset = (inbound: ConfigProfileInbound) 
         return settings?.transport === 'TCP' ? MANAGED_PROTOCOL_CREATION_WHITELIST[3] : null
     }
 
+    if (protocol === 'anytls') {
+        const parsed = AnyTlsProfileExtensionSchema.safeParse({
+            version: 1,
+            listeners: [rawInbound?.settings]
+        })
+        return parsed.success &&
+            parsed.data.listeners[0].tag === inbound.tag &&
+            rawInbound?.tag === inbound.tag &&
+            inbound.network === 'tcp' &&
+            inbound.security === 'tls' &&
+            inbound.port === 443
+            ? MANAGED_PROTOCOL_CREATION_WHITELIST[4]
+            : null
+    }
+
     if (protocol !== 'vless') return null
 
     const streamSettings = getRawStreamSettings(inbound)
@@ -139,11 +161,24 @@ const generateRealityPrivateKey = () => {
 }
 
 export const createManagedProtocolConfig = (
-    presetId: ManagedProtocolCreationPresetId
+    presetId: ManagedProtocolCreationPresetId,
+    anyTlsOptions?: ManagedAnyTlsOptions
 ): Record<string, unknown> => {
     const shortId = randomHex(8)
     const path = randomHex(8)
     const isVision = presetId === 'vless-reality-vision'
+
+    if (presetId === 'anytls-shadowtls') {
+        return {
+            log: { loglevel: 'info' },
+            inbounds: [],
+            outbounds: [{ protocol: 'freedom', tag: 'DIRECT' }],
+            xboardAnyTls: AnyTlsProfileExtensionSchema.parse({
+                version: 1,
+                listeners: [{ ...anyTlsOptions, tag: `ANYTLS_SHADOWTLS_${shortId}` }]
+            })
+        }
+    }
 
     if (presetId === 'mieru-tcp') {
         return {
@@ -271,4 +306,20 @@ export const createManagedProtocolConfig = (
             rules: []
         }
     }
+}
+
+export type ManagedAnyTlsOptions = {
+    wrapperPort: number
+    innerPort: number
+    camouflage: { serverName: string; address: string; port: number }
+}
+
+export function getManagedAnyTlsPresetError(options: ManagedAnyTlsOptions): string | null {
+    const parsed = AnyTlsProfileExtensionSchema.safeParse({
+        version: 1,
+        listeners: [{ ...options, tag: 'PRESET' }]
+    })
+    return parsed.success
+        ? null
+        : parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ')
 }
