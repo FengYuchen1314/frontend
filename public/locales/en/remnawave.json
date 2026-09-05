@@ -1,4 +1,19 @@
 {
+  "shared-dialogs": {
+    "created": "Created successfully",
+    "create-failed": "Creation failed",
+    "creation-context-unavailable": "Creation context is missing. Close this dialog and reopen it from the appropriate page.",
+    "retry": "Retry",
+    "loading-documentation": "Loading documentation…",
+    "loading-tags": "Loading tag suggestions…",
+    "tags-unavailable": "Tag suggestions unavailable",
+    "tags-help": "Up to 10 tags. Separate with a comma, space or semicolon.",
+    "clear-all": "Clear all",
+    "renamed": "Renamed successfully",
+    "rename-failed": "Rename failed",
+    "tags-updated": "Tags updated",
+    "tags-failed": "Could not update tags"
+  },
   "constants": {
     "home": "Home",
     "hosts": "Hosts",

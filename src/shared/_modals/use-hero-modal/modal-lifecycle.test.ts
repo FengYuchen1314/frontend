@@ -111,6 +111,11 @@ test('entity changes, session replacement and unmount independently invalidate w
     const session = h.lifecycle.capture()
     h.replaceSession()
     assert.equal(session.isCurrent(), false)
+    assert.equal(
+        h.lifecycle.capture().isCurrent(),
+        false,
+        'old visible form cannot borrow the replacement account for a fresh submit'
+    )
     const mounted = h.lifecycle.capture()
     h.lifecycle.dispose()
     assert.equal(mounted.isCurrent(), false)
@@ -118,5 +123,7 @@ test('entity changes, session replacement and unmount independently invalidate w
     assert.deepEqual(h.events, [])
     h.lifecycle.mount()
     assert.equal(mounted.isCurrent(), false)
+    assert.equal(h.lifecycle.capture().isCurrent(), false)
+    h.lifecycle.sync('second', { reopened: true })
     assert.equal(h.lifecycle.capture().isCurrent(), true)
 })

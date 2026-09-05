@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { isCancel } from 'axios'
 import { type FormEvent } from 'react'
 import { useForm } from 'react-hook-form'
+import { useTranslation } from 'react-i18next'
 
 import type { HeroModalController } from '@shared/_modals/use-hero-modal'
 import { assertSessionGeneration, getSessionGeneration } from '@shared/api/axios'
@@ -18,6 +19,7 @@ export function useTagsForm(
     initialTags: string[],
     modal: HeroModalController
 ) {
+    const { t } = useTranslation()
     const form = useForm({
         resolver: zodResolver(tagsFormSchema),
         defaultValues: { tags: normalizeTags(initialTags), draft: '' }
@@ -49,13 +51,13 @@ export function useTagsForm(
                 void queryClient.invalidateQueries({ queryKey: definition.queryKey })
                 void queryClient.invalidateQueries({ queryKey: definition.tagsQueryKey })
                 if (!lease.isCurrent()) return
-                toast.success('Tags updated')
+                toast.success(t('shared-dialogs.tags-updated'))
                 modal.resolveAndClose()
             } catch (error) {
                 if (isCancel(error) || !lease.isCurrent()) return
                 const message = error instanceof Error ? error.message : 'Request failed'
                 form.setError('root.server', { type: 'server', message })
-                toast.danger('Could not update tags', { description: message })
+                toast.danger(t('shared-dialogs.tags-failed'), { description: message })
             }
         })(event)
     }

@@ -74,7 +74,7 @@ export const openHostJsonFieldModal = (
         onSave: (value) => form.setFieldValue(field, value),
         path,
         sample,
-        setupSchema: () => MonacoSetupHostJsonFieldsFeature.setup(language),
+        setupSchema: (context) => MonacoSetupHostJsonFieldsFeature.setup(language, context),
         title
     })
 }

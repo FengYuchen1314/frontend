@@ -1,15 +1,17 @@
-import { ActionIcon, ActionIconProps } from '@mantine/core'
+import { Button } from '@heroui/react'
 import clsx from 'clsx'
 import { TbArrowsMaximize, TbArrowsMinimize } from 'react-icons/tb'
 
 import styles from './Fullscreen.module.css'
 
-interface IProps extends ActionIconProps {
+interface IProps {
     className?: string
     floating?: boolean
     iconSize?: number
     isFullscreen: boolean
     onToggle: () => void
+    size?: number
+    isDisabled?: boolean
 }
 
 export function FullscreenToggleButton(props: IProps) {
@@ -19,24 +21,27 @@ export function FullscreenToggleButton(props: IProps) {
         iconSize = 18,
         isFullscreen,
         onToggle,
-        ...actionIconProps
+        size = 36,
+        isDisabled
     } = props
 
     return (
-        <ActionIcon
+        <Button
+            aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+            aria-pressed={isFullscreen}
             className={clsx(floating && styles.button, className)}
-            color="gray"
-            onClick={onToggle}
-            size="lg"
-            variant="soft"
-            {...actionIconProps}
+            isDisabled={isDisabled}
+            isIconOnly
+            onPress={onToggle}
+            style={{ width: size, height: size, minWidth: size }}
+            variant="secondary"
         >
             {isFullscreen ? (
                 <TbArrowsMinimize size={iconSize} />
             ) : (
                 <TbArrowsMaximize size={iconSize} />
             )}
-        </ActionIcon>
+        </Button>
     )
 }
 

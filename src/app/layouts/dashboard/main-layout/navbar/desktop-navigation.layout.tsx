@@ -2,7 +2,7 @@ import type { ElementType, ReactNode } from 'react'
 
 import { Button, Dropdown, Header, Label } from '@heroui/react'
 import clsx from 'clsx'
-import { useContext } from 'react'
+import { useContext, useState } from 'react'
 import { RootMenuTriggerStateContext } from 'react-aria-components/Menu'
 import { PiCaretDownBold } from 'react-icons/pi'
 import { Link, useLocation } from 'react-router'
@@ -29,11 +29,13 @@ function SectionLandingLink({
     href,
     className,
     onClick,
+    onKeyboardOpen,
     children
 }: {
     href: string
     className: string
     onClick: () => void
+    onKeyboardOpen: () => void
     children: ReactNode
 }) {
     const menu = useContext(RootMenuTriggerStateContext)
@@ -44,9 +46,17 @@ function SectionLandingLink({
             to={href}
             onClick={onClick}
             onKeyDown={(event) => {
+                if (event.key === 'Escape' && menu?.isOpen) {
+                    event.preventDefault()
+                    menu.close()
+                    return
+                }
                 if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
                 event.preventDefault()
                 menu?.open(event.key === 'ArrowUp' ? 'last' : 'first')
+                // The previous menu can still exist during its exit animation.
+                // Give an explicit keyboard opening a fresh autofocus lifecycle.
+                onKeyboardOpen()
             }}
         >
             {children}
@@ -58,6 +68,7 @@ export const DesktopNavigation = () => {
     const { pathname } = useLocation()
     const menu = useDesktopMenuSections()
     const state = useNavigationMenu()
+    const [keyboardOpening, setKeyboardOpening] = useState({ section: '', key: 0 })
 
     return (
         <nav
@@ -132,6 +143,12 @@ export const DesktopNavigation = () => {
                                     )}
                                     href={landing}
                                     onClick={() => state.setOpen(sectionId, false)}
+                                    onKeyboardOpen={() =>
+                                        setKeyboardOpening((current) => ({
+                                            section: sectionId,
+                                            key: current.key + 1
+                                        }))
+                                    }
                                 >
                                     <NavIcon icon={section.icon} />
                                     <span>{section.header}</span>
@@ -163,7 +180,12 @@ export const DesktopNavigation = () => {
                             placement="bottom end"
                             isNonModal
                         >
-                            <Dropdown.Menu aria-label={section.header ?? 'Navigation'}>
+                            <Dropdown.Menu
+                                aria-label={section.header ?? 'Navigation'}
+                                key={
+                                    keyboardOpening.section === sectionId ? keyboardOpening.key : 0
+                                }
+                            >
                                 {groups.map((group) => (
                                     <Dropdown.Section
                                         key={group.id}

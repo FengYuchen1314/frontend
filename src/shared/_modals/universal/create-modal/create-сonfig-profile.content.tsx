@@ -1,198 +1,197 @@
-import { Stack, TextInput, Group, Button, Text, Select, NumberInput, Alert } from '@mantine/core'
-import { useField } from '@mantine/form'
-import { CreateConfigProfileCommand } from '@remnawave/backend-contract'
-import { t } from 'i18next'
-import { useState } from 'react'
-import { generatePath, NavigateFunction } from 'react-router'
-
-import { queryClient } from '@shared/api'
-import { useCreateConfigProfile } from '@shared/api/hooks/config-profiles/config-profiles.mutation.hooks'
-import { QueryKeys } from '@shared/api/hooks/keys-factory'
 import {
-    createManagedProtocolConfig,
-    DEFAULT_MANAGED_PROTOCOL_CREATION_PRESET,
+    Alert,
+    Description,
+    FieldError,
+    Input,
+    Label,
+    ListBox,
+    NumberField,
+    Select,
+    TextField
+} from '@heroui/react'
+import { Controller, useWatch } from 'react-hook-form'
+import { useTranslation } from 'react-i18next'
+
+import {
     getManagedAnyTlsPresetError,
-    MANAGED_PROTOCOL_CREATION_WHITELIST,
-    ManagedProtocolCreationPresetId
-} from '@shared/constants'
-import { ROUTES } from '@shared/constants/routes'
+    MANAGED_PROTOCOL_CREATION_WHITELIST
+} from '@shared/constants/managed-protocols'
 
-interface IProps {
-    onClose: () => void
-    navigate: NavigateFunction
-}
+import { CreationForm, type CreationFormModel } from './creation-form'
+import { anyTlsOptions, creationDefaults } from './model/create-draft'
+import { useCreationForm, type CreationContentProps } from './model/use-creation-form'
 
-export const CreateConfigProfileContent = (props: IProps) => {
-    const { onClose, navigate } = props
-    const [managedProtocolPreset, setManagedProtocolPreset] =
-        useState<ManagedProtocolCreationPresetId>(DEFAULT_MANAGED_PROTOCOL_CREATION_PRESET)
-    const [serverName, setServerName] = useState('')
-    const [address, setAddress] = useState('')
-    const [camouflagePort, setCamouflagePort] = useState<string | number>(443)
-    const [wrapperPort, setWrapperPort] = useState<string | number>(14443)
-    const [innerPort, setInnerPort] = useState<string | number>(16001)
-    const isAnyTls = managedProtocolPreset === 'anytls-shadowtls'
-    const anyTlsOptions = {
-        wrapperPort: Number(wrapperPort),
-        innerPort: Number(innerPort),
-        camouflage: {
-            serverName: serverName.trim(),
-            address: address.trim(),
-            port: Number(camouflagePort)
-        }
-    }
-    const anyTlsError = isAnyTls ? getManagedAnyTlsPresetError(anyTlsOptions) : null
+const portFields = [
+    { name: 'camouflagePort', label: 'anytls-camouflage-port', min: 1 },
+    { name: 'wrapperPort', label: 'anytls-wrapper-port', min: 1024 },
+    { name: 'innerPort', label: 'anytls-inner-port', min: 1024 }
+] as const
 
-    const handleUpdate = async () => {
-        await queryClient.refetchQueries({
-            queryKey: QueryKeys.configProfiles.getConfigProfiles.queryKey
-        })
-    }
-
-    const nameField = useField<CreateConfigProfileCommand.RequestBody['name']>({
-        initialValue: '',
-        validateOnChange: true,
-        validate: (value) => {
-            const result = CreateConfigProfileCommand.RequestBodySchema.omit({
-                config: true
-            }).safeParse({ name: value })
-            return result.success ? null : result.error.issues[0]?.message
-        }
-    })
-    const { mutate: createConfigProfile, isPending } = useCreateConfigProfile({
-        mutationFns: {
-            onSuccess: (data) => {
-                onClose()
-
-                handleUpdate()
-                navigate(
-                    generatePath(ROUTES.DASHBOARD.MANAGEMENT.CONFIG_PROFILE_BY_UUID, {
-                        uuid: data.uuid
-                    })
-                )
-            }
-        }
-    })
-
+export function ConfigProfileCreationForm({
+    model,
+    modal
+}: { model: CreationFormModel } & Pick<CreationContentProps, 'modal'>) {
+    const { t } = useTranslation()
+    const { form, isPending } = model
+    const watched = useWatch({ control: form.control })
+    const values = { ...creationDefaults(), ...watched }
+    const isAnyTls = values.managedProtocolPreset === 'anytls-shadowtls'
+    const anyTlsError = isAnyTls ? getManagedAnyTlsPresetError(anyTlsOptions(values)) : null
     return (
-        <form
-            onSubmit={(e) => {
-                e.preventDefault()
-                if (anyTlsError) return
-                createConfigProfile({
-                    variables: {
-                        name: nameField.getValue(),
-                        config: createManagedProtocolConfig(managedProtocolPreset, anyTlsOptions)
-                    }
-                })
-            }}
-        >
-            <Stack gap="md">
-                <Text size="sm">
+        <CreationForm
+            model={model}
+            modal={modal}
+            nameLabel={t('config-profiles-header-action-buttons.feature.profile-name')}
+            namePlaceholder={t('config-profiles-header-action-buttons.feature.enter-profile-name')}
+            isDisabled={!!anyTlsError}
+            description={
+                <p className="text-sm text-muted">
                     {t(
                         'config-profiles-header-action-buttons.feature.create-a-new-config-profile-by-entering-a-name-below'
                     )}
                     <br />
-
                     {t(
                         'config-profiles-header-action-buttons.feature.you-can-customize-xray-config-after-creation'
                     )}
-                </Text>
-                <TextInput
-                    data-autofocus
-                    label={t('config-profiles-header-action-buttons.feature.profile-name')}
-                    placeholder={t(
-                        'config-profiles-header-action-buttons.feature.enter-profile-name'
-                    )}
-                    required
-                    {...nameField.getInputProps()}
-                />
-                <Select
-                    allowDeselect={false}
-                    data={MANAGED_PROTOCOL_CREATION_WHITELIST.map(({ id, label }) => ({
-                        label,
-                        value: id
-                    }))}
-                    description={t(
-                        'config-profiles-header-action-buttons.feature.managed-protocol-description'
-                    )}
-                    label={t('config-profiles-header-action-buttons.feature.managed-protocol')}
-                    onChange={(value) => {
-                        const selectedPreset = MANAGED_PROTOCOL_CREATION_WHITELIST.find(
-                            (preset) => preset.id === value
-                        )
-                        if (selectedPreset) setManagedProtocolPreset(selectedPreset.id)
-                    }}
-                    value={managedProtocolPreset}
-                />
-                {isAnyTls && (
-                    <Stack gap="sm">
-                        <Alert color="blue">
-                            {t('config-profiles-header-action-buttons.feature.anytls-help')}
-                        </Alert>
-                        <TextInput
-                            label={t('config-profiles-header-action-buttons.feature.anytls-sni')}
-                            onChange={(event) => setServerName(event.currentTarget.value)}
-                            required
-                            value={serverName}
-                        />
-                        <TextInput
-                            label={t(
-                                'config-profiles-header-action-buttons.feature.anytls-address'
+                </p>
+            }
+        >
+            <Controller
+                control={form.control}
+                name="managedProtocolPreset"
+                render={({ field, fieldState }) => (
+                    <Select
+                        name={field.name}
+                        value={field.value}
+                        onChange={(value) => {
+                            const preset = MANAGED_PROTOCOL_CREATION_WHITELIST.find(
+                                (item) => item.id === value
+                            )
+                            if (preset) field.onChange(preset.id)
+                        }}
+                        onBlur={field.onBlur}
+                        isRequired
+                        isDisabled={isPending}
+                        isInvalid={fieldState.invalid}
+                        fullWidth
+                    >
+                        <Label>
+                            {t('config-profiles-header-action-buttons.feature.managed-protocol')}
+                        </Label>
+                        <Select.Trigger ref={field.ref}>
+                            <Select.Value />
+                            <Select.Indicator />
+                        </Select.Trigger>
+                        <Description>
+                            {t(
+                                'config-profiles-header-action-buttons.feature.managed-protocol-description'
                             )}
-                            onChange={(event) => setAddress(event.currentTarget.value)}
-                            required
-                            value={address}
-                        />
-                        <NumberInput
-                            label={t(
-                                'config-profiles-header-action-buttons.feature.anytls-camouflage-port'
-                            )}
-                            max={65535}
-                            min={1}
-                            onChange={setCamouflagePort}
-                            required
-                            value={camouflagePort}
-                        />
-                        <Group grow>
-                            <NumberInput
-                                label={t(
-                                    'config-profiles-header-action-buttons.feature.anytls-wrapper-port'
-                                )}
-                                max={65535}
-                                min={1024}
-                                onChange={setWrapperPort}
-                                required
-                                value={wrapperPort}
-                            />
-                            <NumberInput
-                                label={t(
-                                    'config-profiles-header-action-buttons.feature.anytls-inner-port'
-                                )}
-                                max={65535}
-                                min={1024}
-                                onChange={setInnerPort}
-                                required
-                                value={innerPort}
-                            />
-                        </Group>
-                        {anyTlsError && (serverName || address) && (
-                            <Text c="red" size="xs">
-                                {anyTlsError}
-                            </Text>
-                        )}
-                    </Stack>
+                        </Description>
+                        <Select.Popover>
+                            <ListBox>
+                                {MANAGED_PROTOCOL_CREATION_WHITELIST.map((preset) => (
+                                    <ListBox.Item
+                                        key={preset.id}
+                                        id={preset.id}
+                                        textValue={preset.label}
+                                    >
+                                        {preset.label}
+                                        <ListBox.ItemIndicator />
+                                    </ListBox.Item>
+                                ))}
+                            </ListBox>
+                        </Select.Popover>
+                        <FieldError>{fieldState.error?.message}</FieldError>
+                    </Select>
                 )}
-                <Group justify="flex-end">
-                    <Button color="gray" onClick={onClose} variant="light">
-                        {t('common.action.cancel')}
-                    </Button>
-
-                    <Button color="teal" disabled={!!anyTlsError} loading={isPending} type="submit">
-                        {t('common.action.create')}
-                    </Button>
-                </Group>
-            </Stack>
-        </form>
+            />
+            {isAnyTls && (
+                <section className="flex flex-col gap-4" aria-label="AnyTLS + ShadowTLS">
+                    <Alert status="accent">
+                        <Alert.Indicator />
+                        <Alert.Content>
+                            <Alert.Description>
+                                {t('config-profiles-header-action-buttons.feature.anytls-help')}
+                            </Alert.Description>
+                        </Alert.Content>
+                    </Alert>
+                    {(['serverName', 'address'] as const).map((name) => (
+                        <Controller
+                            key={name}
+                            control={form.control}
+                            name={name}
+                            render={({ field, fieldState }) => (
+                                <TextField
+                                    name={field.name}
+                                    value={field.value}
+                                    onChange={field.onChange}
+                                    onBlur={field.onBlur}
+                                    isRequired
+                                    isDisabled={isPending}
+                                    isInvalid={fieldState.invalid}
+                                >
+                                    <Label>
+                                        {t(
+                                            name === 'serverName'
+                                                ? 'config-profiles-header-action-buttons.feature.anytls-sni'
+                                                : 'config-profiles-header-action-buttons.feature.anytls-address'
+                                        )}
+                                    </Label>
+                                    <Input ref={field.ref} variant="secondary" />
+                                    <FieldError>{fieldState.error?.message}</FieldError>
+                                </TextField>
+                            )}
+                        />
+                    ))}
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                        {portFields.map(({ name, label, min }) => (
+                            <Controller
+                                key={name}
+                                control={form.control}
+                                name={name}
+                                render={({ field, fieldState }) => (
+                                    <NumberField
+                                        name={field.name}
+                                        value={field.value}
+                                        onChange={field.onChange}
+                                        onBlur={field.onBlur}
+                                        minValue={min}
+                                        maxValue={65535}
+                                        step={1}
+                                        formatOptions={{ useGrouping: false }}
+                                        isRequired
+                                        isDisabled={isPending}
+                                        isInvalid={fieldState.invalid}
+                                    >
+                                        <Label>
+                                            {t(
+                                                `config-profiles-header-action-buttons.feature.${label}`
+                                            )}
+                                        </Label>
+                                        <NumberField.Group>
+                                            <NumberField.DecrementButton />
+                                            <NumberField.Input ref={field.ref} />
+                                            <NumberField.IncrementButton />
+                                        </NumberField.Group>
+                                        <FieldError>{fieldState.error?.message}</FieldError>
+                                    </NumberField>
+                                )}
+                            />
+                        ))}
+                    </div>
+                    {anyTlsError &&
+                        (values.serverName || values.address || form.formState.submitCount > 0) && (
+                            <p role="alert" className="text-sm text-danger">
+                                {anyTlsError}
+                            </p>
+                        )}
+                </section>
+            )}
+        </CreationForm>
     )
+}
+
+export function CreateConfigProfileContent(props: CreationContentProps) {
+    const model = useCreationForm('configProfile', props)
+    return <ConfigProfileCreationForm model={model} modal={props.modal} />
 }

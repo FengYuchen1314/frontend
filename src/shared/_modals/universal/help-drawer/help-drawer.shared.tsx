@@ -40,7 +40,7 @@ export const HelpDrawerShared = NiceModal.create(({ screen }: IProps) => {
                                     className="flex min-h-56 items-center justify-center gap-3"
                                 >
                                     <Spinner />
-                                    Loading documentation…
+                                    {t('shared-dialogs.loading-documentation')}
                                 </div>
                             )}
                             {article.error && (
@@ -55,7 +55,7 @@ export const HelpDrawerShared = NiceModal.create(({ screen }: IProps) => {
                                             variant="secondary"
                                             onPress={article.retry}
                                         >
-                                            Retry
+                                            {t('shared-dialogs.retry')}
                                         </Button>
                                     </Alert.Content>
                                 </Alert>

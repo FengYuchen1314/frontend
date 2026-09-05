@@ -11,6 +11,7 @@ export function createHeroModalLifecycle(getHandler: () => Handler, getSession: 
     let epoch = 0
     let scope: unknown
     let invocation: unknown
+    let openingSession = getSession()
     let visible = false
     let active = false
     let mounted = true
@@ -21,6 +22,7 @@ export function createHeroModalLifecycle(getHandler: () => Handler, getSession: 
         if (nextVisible !== visible || nextScope !== scope || nextInvocation !== invocation) {
             epoch++
             active = nextVisible
+            if (nextVisible) openingSession = getSession()
             completed = false
             if (nextVisible || nextScope !== scope || nextInvocation !== invocation)
                 resolved = false
@@ -42,7 +44,9 @@ export function createHeroModalLifecycle(getHandler: () => Handler, getSession: 
         close,
         capture: () => {
             const owner = epoch
-            const session = getSession()
+            // A fresh click in an old visible dialog is still old intent. Never
+            // let it acquire the replacement account's authorization generation.
+            const session = openingSession
             return {
                 isCurrent: () => mounted && active && owner === epoch && session === getSession()
             }

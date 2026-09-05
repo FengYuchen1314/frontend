@@ -1,131 +1,78 @@
-import type { editor } from 'monaco-editor'
+import type { EditorProps } from '@monaco-editor/react'
+import type { ReactNode } from 'react'
 
-import { Box, Text } from '@mantine/core'
-import { notifications } from '@mantine/notifications'
-import Editor, { EditorProps, OnMount } from '@monaco-editor/react'
+import { Spinner } from '@heroui/react'
+import Editor from '@monaco-editor/react'
 import clsx from 'clsx'
-import { parse } from 'jsonc-parser'
-import { Fragment, ReactNode, useRef, useState } from 'react'
+import { Fragment, useLayoutEffect, useState } from 'react'
 
 import { BASE_MONACO_OPTIONS, MONACO_THEME_NAME } from '@shared/constants/monaco-theme'
-import { describeJsonPath } from '@shared/utils/monaco/json-path'
-import { RepairResult, repairJsonInEditor } from '@shared/utils/monaco/repair-json'
+import type { RepairResult } from '@shared/utils/monaco/repair-json'
 
-import { LoaderModalShared } from '../loader-modal/loader-model.shared'
+import { createCodeEditorRuntime, REPAIR_MESSAGES } from './code-editor.model'
 import styles from './CodeEditor.module.css'
+import { EditorStatusBar } from './editor-status-bar'
 
-const REPAIR_ACTION_ID = 'remnawave.repairJson'
-
-const REPAIR_LABEL = 'Repair JSON'
-
-const RESULT_COLORS: Record<RepairResult, { color: string; message: string }> = {
-    failed: { color: 'red', message: 'Could not repair this JSON' },
-    repaired: { color: 'teal', message: 'JSON repaired' },
-    unchanged: { color: 'gray', message: 'Nothing to repair' }
-}
-
-interface Props extends Omit<EditorProps, 'wrapperProps'> {
+export interface CodeEditorProps extends Omit<EditorProps, 'wrapperProps'> {
     footer?: ReactNode
     withJsonPath?: boolean
     wrapperProps?: Record<string, unknown> & { className?: string }
 }
 
-export function CodeEditor(props: Props) {
+export function CodeEditor(props: CodeEditorProps) {
     const {
         defaultLanguage,
         footer,
         language,
         onMount,
+        beforeMount,
+        onChange,
+        onValidate,
         options,
         withJsonPath,
         wrapperProps,
+        keepCurrentModel,
+        loading,
+        theme = MONACO_THEME_NAME,
         ...rest
     } = props
-
     const [jsonPath, setJsonPath] = useState<string[]>([])
-    const documentTextRef = useRef('')
-    const documentValueRef = useRef<unknown>(undefined)
-
+    const [repairResult, setRepairResult] = useState<RepairResult | null>(null)
     const isJson = (language ?? defaultLanguage) === 'json'
     const showJsonPath = withJsonPath ?? isJson
-
-    const syncDocumentSnapshot = (instance: editor.IStandaloneCodeEditor) => {
-        const model = instance.getModel()
-
-        if (!model) return
-
-        const text = model.getValue()
-
-        documentTextRef.current = text
-        documentValueRef.current = parse(text)
+    const configuration = {
+        isJson,
+        showJsonPath,
+        keepCurrentModel,
+        onMount,
+        beforeMount,
+        onChange,
+        onValidate,
+        onPath: (next: string[]) =>
+            setJsonPath((current) =>
+                current.length === next.length &&
+                current.every((segment, index) => segment === next[index])
+                    ? current
+                    : next
+            ),
+        onRepair: setRepairResult
     }
-
-    const updateJsonPath = (instance: editor.IStandaloneCodeEditor) => {
-        const model = instance.getModel()
-        const [firstVisibleRange] = instance.getVisibleRanges()
-
-        if (!model || !firstVisibleRange) {
-            setJsonPath([])
-            return
-        }
-
-        const topLine = firstVisibleRange.startLineNumber
-
-        const offset = model.getOffsetAt({
-            lineNumber: topLine,
-            column: model.getLineMaxColumn(topLine)
-        })
-
-        const nextPath = describeJsonPath(documentTextRef.current, offset, documentValueRef.current)
-
-        setJsonPath((currentPath) =>
-            currentPath.length === nextPath.length &&
-            currentPath.every((segment, index) => segment === nextPath[index])
-                ? currentPath
-                : nextPath
-        )
-    }
-
-    const handleMount: OnMount = (instance, monaco) => {
-        if (isJson) {
-            instance.addAction({
-                id: REPAIR_ACTION_ID,
-                label: REPAIR_LABEL,
-                contextMenuGroupId: '1_modification',
-                contextMenuOrder: 1.32,
-                run: (target) => {
-                    const result = repairJsonInEditor(target as editor.IStandaloneCodeEditor)
-
-                    notifications.show({
-                        color: RESULT_COLORS[result].color,
-                        message: RESULT_COLORS[result].message,
-                        title: REPAIR_LABEL
-                    })
-                }
-            })
-        }
-
-        if (showJsonPath) {
-            syncDocumentSnapshot(instance)
-            updateJsonPath(instance)
-
-            instance.onDidScrollChange(() => updateJsonPath(instance))
-            instance.onDidChangeModelContent(() => {
-                syncDocumentSnapshot(instance)
-                updateJsonPath(instance)
-            })
-        }
-
-        onMount?.(instance, monaco)
-    }
+    const [runtime] = useState(() => createCodeEditorRuntime(configuration))
+    useLayoutEffect(() => {
+        runtime.configure(configuration)
+    })
+    useLayoutEffect(() => {
+        runtime.activate()
+        return runtime.suspend
+    }, [runtime])
 
     return (
-        <Box className={styles.root}>
+        <div className={styles.root}>
             {showJsonPath && (
-                <Box className={styles.pathBar}>
-                    <Text c="dimmed" ff="monospace" size="xs" truncate="end">
+                <div aria-label="JSON path" className={styles.pathBar}>
+                    <p className={styles.pathText}>
                         {jsonPath.map((segment, index) => (
-                            <Fragment key={`${index}-${segment}`}>
+                            <Fragment key={index + '-' + segment}>
                                 {index > 0 && <span className={styles.pathSeparator}> › </span>}
                                 <span
                                     className={
@@ -138,26 +85,48 @@ export function CodeEditor(props: Props) {
                                 </span>
                             </Fragment>
                         ))}
-                    </Text>
-                </Box>
+                    </p>
+                </div>
             )}
-
             <Editor
-                defaultLanguage={defaultLanguage}
-                language={language}
-                loading={<LoaderModalShared mih="100%" />}
-                onMount={handleMount}
-                theme={MONACO_THEME_NAME}
                 {...rest}
+                beforeMount={runtime.prepare}
+                defaultLanguage={defaultLanguage}
+                keepCurrentModel={keepCurrentModel}
+                language={language}
+                loading={
+                    loading ?? (
+                        <div className={styles.loading} role="status">
+                            <Spinner />
+                            <span>Loading editor…</span>
+                        </div>
+                    )
+                }
+                onChange={runtime.change}
+                onMount={runtime.mount}
+                onValidate={runtime.validate}
                 options={{ ...BASE_MONACO_OPTIONS, ...options }}
+                theme={theme}
                 wrapperProps={{
                     ...wrapperProps,
                     className: clsx(styles.editorWrapper, wrapperProps?.className)
                 }}
             />
-
+            {repairResult && (
+                <EditorStatusBar
+                    status={
+                        repairResult === 'failed'
+                            ? 'error'
+                            : repairResult === 'repaired'
+                              ? 'success'
+                              : 'warning'
+                    }
+                >
+                    {REPAIR_MESSAGES[repairResult]}
+                </EditorStatusBar>
+            )}
             {footer}
-        </Box>
+        </div>
     )
 }
 

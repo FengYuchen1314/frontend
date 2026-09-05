@@ -12,6 +12,7 @@ import consola from 'consola'
 import { app } from 'src/config'
 import { z } from 'zod'
 
+import type { EditorSetupContext } from '@shared/ui/code-editor/editor-operation-scope'
 import { registerJsonSchema } from '@shared/utils/monaco/json-schema-registry'
 
 interface ISchemaNode {
@@ -609,8 +610,9 @@ const buildFinalMaskProperties = (definitions: Record<string, ISchemaNode | unde
 }
 
 export const MonacoSetupHostJsonFieldsFeature = {
-    setup: async (currentLanguage: string) => {
+    setup: async (currentLanguage: string, context?: EditorSetupContext) => {
         try {
+            if (context && (context.signal.aborted || !context.isCurrent())) return
             let { jsonSchemaUrl } = app.configEditor
             switch (currentLanguage) {
                 case 'zh':
@@ -620,10 +622,15 @@ export const MonacoSetupHostJsonFieldsFeature = {
                     jsonSchemaUrl = app.configEditor.jsonSchemaUrl
             }
 
-            const response = await axios.get<IXraySchema>(jsonSchemaUrl)
+            const response = await axios.get<IXraySchema>(
+                jsonSchemaUrl,
+                context ? { signal: context.signal } : undefined
+            )
+            if (context && (context.signal.aborted || !context.isCurrent())) return
             const { definitions = {} } = response.data
 
             HOST_JSON_FIELD_SCHEMAS.forEach(({ definition, fileMatch, uri }) => {
+                if (context && (context.signal.aborted || !context.isCurrent())) return
                 const node = definitions[definition]
 
                 if (!node) {
@@ -646,6 +653,10 @@ export const MonacoSetupHostJsonFieldsFeature = {
                 })
             })
         } catch (error) {
+            if (context) {
+                if (!context.signal.aborted && context.isCurrent()) throw error
+                return
+            }
             consola.error('Failed to load JSON schema:', error)
         }
     }

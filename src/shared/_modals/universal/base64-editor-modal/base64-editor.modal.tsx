@@ -1,177 +1,232 @@
-import type { editor } from 'monaco-editor'
-
 import NiceModal, { useModal } from '@ebay/nice-modal-react'
-import { Box, Button, Modal, Paper, SegmentedControl } from '@mantine/core'
+import { Button, ButtonGroup, Modal } from '@heroui/react'
 import clsx from 'clsx'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { TbBinary } from 'react-icons/tb'
 
-import { useNiceMantineModal } from '@shared/_modals/use-nice-modal'
+import type { HeroModalController } from '@shared/_modals/use-hero-modal'
+import { HeroModalPresence, useHeroModal } from '@shared/_modals/use-hero-modal'
 import { COMPACT_MONACO_OPTIONS } from '@shared/constants/monaco-theme'
-import { usePseudoFullscreen } from '@shared/hooks'
+import { usePseudoFullscreen } from '@shared/hooks/use-pseudo-fullscreen'
 import { CodeEditor, editorClasses, EditorFooter, EditorStatusBar } from '@shared/ui/code-editor'
-import { fullscreenClasses, FullscreenToggleButton } from '@shared/ui/fullscreen-toggle-button'
-import { BaseOverlayHeader } from '@shared/ui/overlays/base-overlay-header'
-import { decodeBase64, encodeBase64 } from '@shared/utils/misc/base64'
+import {
+    createEditorOperationScope,
+    saveEditorValue
+} from '@shared/ui/code-editor/editor-operation-scope'
+import { FullscreenToggleButton } from '@shared/ui/fullscreen-toggle-button'
 import { forceMonacoRetokenize } from '@shared/utils/monaco/force-retokenize'
 
+import {
+    BASE64_LANGUAGES,
+    createBase64Draft,
+    INVALID_BASE64_MESSAGE,
+    updateBase64Decoded,
+    updateBase64Encoded,
+    validateBase64Draft
+} from './base64-editor.model'
 import classes from './Base64EditorModal.module.css'
 
-const INVALID_BASE64_MESSAGE = 'Value is not valid base64'
-
-const LANGUAGES = [
-    { label: 'JSON', value: 'json' },
-    { label: 'YAML', value: 'yaml' },
-    { label: 'Text', value: 'plaintext' }
-]
-
-const detectLanguage = (value: string): string => {
-    const trimmed = value.trim()
-
-    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-        try {
-            JSON.parse(trimmed)
-            return 'json'
-        } catch {
-            return 'plaintext'
-        }
-    }
-
-    return 'plaintext'
-}
-
-interface IProps {
+export interface Base64EditorModalProps {
     label?: string
-    onSave: (encoded: string) => void
+    onSave: (encoded: string) => void | Promise<void>
     value: string
 }
 
-export const Base64EditorModal = NiceModal.create((props: IProps) => {
-    const { label, onSave, value } = props
-
-    const modal = useModal()
-    const { modalProps, hide } = useNiceMantineModal({ modal })
-
+export function Base64EditorDialog({
+    modal,
+    label,
+    onSave,
+    value
+}: Base64EditorModalProps & { modal: HeroModalController }) {
     const { t } = useTranslation()
-    const { isFullscreen, toggle: toggleFullscreen } = usePseudoFullscreen()
-
-    const initialDecoded = decodeBase64(value) ?? ''
-
-    const [decoded, setDecoded] = useState(initialDecoded)
-    const [encoded, setEncoded] = useState(value)
-    const [error, setError] = useState<null | string>(null)
-    const [language, setLanguage] = useState(detectLanguage(initialDecoded))
-
-    const handleDecodedChange = (nextValue: string | undefined) => {
-        const nextDecoded = nextValue ?? ''
-
-        setDecoded(nextDecoded)
-        setEncoded(encodeBase64(nextDecoded))
-        setError(null)
+    const fullscreen = usePseudoFullscreen(false, modal.isOpen)
+    const [scope] = useState(createEditorOperationScope)
+    const [draft, setDraft] = useState(() => createBase64Draft(value))
+    const [saving, setSaving] = useState(false)
+    useEffect(() => {
+        if (modal.isOpen) scope.activate(modal.capture().isCurrent)
+        else scope.cancel()
+        return scope.cancel
+    }, [scope, modal.isOpen, modal.presentationKey])
+    const close = () => {
+        scope.cancel()
+        fullscreen.close()
+        modal.close()
     }
-
-    const handleEncodedChange = (nextValue: string | undefined) => {
-        const nextEncoded = (nextValue ?? '').trim()
-
-        setEncoded(nextEncoded)
-
-        const nextDecoded = decodeBase64(nextEncoded)
-
-        if (nextDecoded === null) {
-            setError(INVALID_BASE64_MESSAGE)
+    const save = async () => {
+        if (saving || !scope.isCurrent()) return
+        if (!validateBase64Draft(draft)) {
+            setDraft((current) => ({ ...current, error: INVALID_BASE64_MESSAGE }))
             return
         }
-
-        setDecoded(nextDecoded)
-        setError(null)
+        const operation = scope.begin()
+        setSaving(true)
+        const result = await saveEditorValue(draft.encoded, onSave, operation)
+        if (result === 'saved' && operation.isCurrent()) close()
+        if (result === 'error' && operation.isCurrent())
+            setDraft((current) => ({
+                ...current,
+                error: 'Could not save Base64. Your changes are still here; try again.'
+            }))
+        if (operation.isCurrent()) setSaving(false)
+        operation.finish()
     }
-
-    const handleSave = () => {
-        if (decodeBase64(encoded) === null) {
-            setError(INVALID_BASE64_MESSAGE)
-            return
-        }
-
-        onSave(encoded)
-        hide()
-    }
-
-    const renderEditor = (
-        paneLanguage: string,
-        paneValue: string,
-        onChange: (nextValue: string | undefined) => void,
-        withError?: boolean
-    ) => (
-        <Box className={classes.pane}>
-            <Paper
-                className={clsx(
-                    classes.editorWrapper,
-                    editorClasses.editorAttached,
-                    withError && error && classes.editorWrapperError,
-                    isFullscreen && fullscreenClasses.fill
-                )}
-                p={0}
-                pos="relative"
-                withBorder
-            >
-                <CodeEditor
-                    language={paneLanguage}
-                    onChange={onChange}
-                    onMount={(editorInstance: editor.IStandaloneCodeEditor) =>
-                        forceMonacoRetokenize(editorInstance)
-                    }
-                    options={{ ...COMPACT_MONACO_OPTIONS, wordWrap: 'on' }}
-                    value={paneValue}
-                    withJsonPath={false}
-                />
-            </Paper>
-        </Box>
-    )
-
     return (
         <Modal
-            {...modalProps}
-            size="90%"
-            title={
-                <BaseOverlayHeader
-                    iconColor="grape"
-                    IconComponent={TbBinary}
-                    iconVariant="soft"
-                    subtitle={label}
-                    title="Base64 editor"
-                />
-            }
-            transitionProps={{ transition: 'fade', duration: 200 }}
+            isOpen={modal.isOpen}
+            onOpenChange={(open) => {
+                if (!open) close()
+            }}
         >
-            <Box className={clsx(classes.container, isFullscreen && fullscreenClasses.overlay)}>
-                <Box className={clsx(classes.panes, isFullscreen && classes.panesFill)}>
-                    {renderEditor(language, decoded, handleDecodedChange)}
-                    {renderEditor('plaintext', encoded, handleEncodedChange, true)}
-                </Box>
-
-                {error && <EditorStatusBar status="error">{error}</EditorStatusBar>}
-
-                <EditorFooter className={clsx(error && classes.footerError)}>
-                    <FullscreenToggleButton
-                        floating={false}
-                        isFullscreen={isFullscreen}
-                        onToggle={toggleFullscreen}
-                        size={36}
-                    />
-
-                    <Button onClick={handleSave} variant="soft">
-                        {t('common.action.save')}
-                    </Button>
-
-                    <SegmentedControl
-                        data={LANGUAGES}
-                        onChange={setLanguage}
-                        size="xs"
-                        value={language}
-                    />
-                </EditorFooter>
-            </Box>
+            <Modal.Backdrop isKeyboardDismissDisabled={fullscreen.isFullscreen}>
+                <HeroModalPresence onExitComplete={modal.afterClose} />
+                <Modal.Container scroll="inside" size={fullscreen.isFullscreen ? 'full' : 'cover'}>
+                    <Modal.Dialog
+                        className={clsx(
+                            classes.dialog,
+                            fullscreen.isFullscreen && classes.dialogFull
+                        )}
+                    >
+                        <Modal.CloseTrigger />
+                        <Modal.Header>
+                            <Modal.Heading className="flex items-center gap-2">
+                                <TbBinary aria-hidden="true" />
+                                Base64 editor
+                            </Modal.Heading>
+                            {label && <p className="text-sm text-muted">{label}</p>}
+                        </Modal.Header>
+                        <Modal.Body className={classes.container}>
+                            <div
+                                className={clsx(
+                                    classes.panes,
+                                    fullscreen.isFullscreen && classes.panesFill
+                                )}
+                            >
+                                <section aria-label="Decoded content" className={classes.pane}>
+                                    <h3 className="pb-1 text-sm text-muted">Decoded content</h3>
+                                    <div
+                                        className={clsx(
+                                            classes.editorWrapper,
+                                            editorClasses.editorAttached,
+                                            fullscreen.isFullscreen && classes.editorFill
+                                        )}
+                                    >
+                                        <CodeEditor
+                                            language={draft.language}
+                                            onChange={(next) => {
+                                                if (scope.isCurrent())
+                                                    setDraft((current) =>
+                                                        updateBase64Decoded(current, next)
+                                                    )
+                                            }}
+                                            onMount={(instance) => {
+                                                if (scope.isCurrent())
+                                                    forceMonacoRetokenize(instance)
+                                            }}
+                                            options={{
+                                                ...COMPACT_MONACO_OPTIONS,
+                                                ariaLabel: 'Decoded content',
+                                                readOnly: saving,
+                                                wordWrap: 'on'
+                                            }}
+                                            value={draft.decoded}
+                                            withJsonPath={false}
+                                        />
+                                    </div>
+                                </section>
+                                <section aria-label="Base64 content" className={classes.pane}>
+                                    <h3 className="pb-1 text-sm text-muted">Base64 content</h3>
+                                    <div
+                                        className={clsx(
+                                            classes.editorWrapper,
+                                            editorClasses.editorAttached,
+                                            draft.error && classes.editorWrapperError,
+                                            fullscreen.isFullscreen && classes.editorFill
+                                        )}
+                                    >
+                                        <CodeEditor
+                                            language="plaintext"
+                                            onChange={(next) => {
+                                                if (scope.isCurrent())
+                                                    setDraft((current) =>
+                                                        updateBase64Encoded(current, next)
+                                                    )
+                                            }}
+                                            onMount={(instance) => {
+                                                if (scope.isCurrent())
+                                                    forceMonacoRetokenize(instance)
+                                            }}
+                                            options={{
+                                                ...COMPACT_MONACO_OPTIONS,
+                                                ariaLabel: 'Base64 content',
+                                                readOnly: saving,
+                                                wordWrap: 'on'
+                                            }}
+                                            value={draft.encoded}
+                                            withJsonPath={false}
+                                        />
+                                    </div>
+                                </section>
+                            </div>
+                            {draft.error && (
+                                <EditorStatusBar status="error">{draft.error}</EditorStatusBar>
+                            )}
+                            <EditorFooter className={clsx(draft.error && classes.footerError)}>
+                                <FullscreenToggleButton
+                                    floating={false}
+                                    isFullscreen={fullscreen.isFullscreen}
+                                    onToggle={fullscreen.toggle}
+                                />
+                                <ButtonGroup
+                                    aria-label="Decoded language"
+                                    size="sm"
+                                    variant="secondary"
+                                >
+                                    {BASE64_LANGUAGES.map((language) => (
+                                        <Button
+                                            aria-pressed={draft.language === language}
+                                            isDisabled={saving}
+                                            key={language}
+                                            onPress={() =>
+                                                setDraft((current) => ({ ...current, language }))
+                                            }
+                                            variant={
+                                                draft.language === language
+                                                    ? 'primary'
+                                                    : 'secondary'
+                                            }
+                                        >
+                                            {language === 'plaintext'
+                                                ? 'Text'
+                                                : language.toUpperCase()}
+                                        </Button>
+                                    ))}
+                                </ButtonGroup>
+                                <div className="ms-auto flex gap-2">
+                                    <Button onPress={close} variant="ghost">
+                                        {t('common.action.cancel')}
+                                    </Button>
+                                    <Button
+                                        isPending={saving}
+                                        onPress={() => {
+                                            void save()
+                                        }}
+                                    >
+                                        {t('common.action.save')}
+                                    </Button>
+                                </div>
+                            </EditorFooter>
+                        </Modal.Body>
+                    </Modal.Dialog>
+                </Modal.Container>
+            </Modal.Backdrop>
         </Modal>
     )
+}
+
+export const Base64EditorModal = NiceModal.create((props: Base64EditorModalProps) => {
+    const niceModal = useModal()
+    const modal = useHeroModal({ modal: niceModal })
+    return <Base64EditorDialog {...props} key={modal.presentationKey} modal={modal} />
 })

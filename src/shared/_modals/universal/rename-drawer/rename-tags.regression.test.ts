@@ -64,7 +64,11 @@ function renderHook<T>(useHook: () => T): T {
         return null
     }
     renderToString(
-        createElement(QueryClientProvider, { client: queryClient }, createElement(Harness))
+        createElement(
+            I18nextProvider,
+            { i18n },
+            createElement(QueryClientProvider, { client: queryClient }, createElement(Harness))
+        )
     )
     return result
 }
@@ -83,6 +87,7 @@ function modalHarness() {
     const lifecycle = createHeroModalLifecycle(() => nice, getSessionGeneration)
     lifecycle.sync('entity-a')
     const modal: HeroModalController = {
+        presentationKey: 0,
         isOpen: true,
         close: () => lifecycle.close(),
         onOpenChange: (open) => {
@@ -242,7 +247,7 @@ test('the actual HeroUI tag editor renders removable tags, suggestions, clear, s
     assert.match(html, /ENV:PROD/)
     assert.match(html, /<datalist\b/)
     assert.match(html, /<option value="REGION:SG"/)
-    assert.match(html, /Clear all/)
+    assert.match(html, /shared-dialogs.clear-all/)
     assert.match(html, /type="submit"/)
     assert.doesNotMatch(html, /mantine-/)
 })

@@ -1,5 +1,4 @@
-import { Code, Paper } from '@mantine/core'
-import { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 
 import styles from './CodeEditor.module.css'
 
@@ -21,23 +20,21 @@ export function EditorStatusBar(props: Props) {
     const tone = TONES[status]
 
     return (
-        <Paper
+        <div
             className={styles.statusBar}
-            px="md"
-            py="xs"
-            radius={0}
-            style={{
-                backgroundColor: tone.background,
-                borderTop: `1px solid ${tone.border}`
-            }}
+            role={status === 'error' ? 'alert' : 'status'}
+            style={
+                {
+                    backgroundColor: tone.background,
+                    borderTop: `1px solid ${tone.border}`
+                } as CSSProperties
+            }
         >
             {typeof children === 'string' ? (
-                <Code className={styles.statusCode} color={tone.code}>
-                    {children}
-                </Code>
+                <code className={styles.statusCode}>{children}</code>
             ) : (
                 children
             )}
-        </Paper>
+        </div>
     )
 }

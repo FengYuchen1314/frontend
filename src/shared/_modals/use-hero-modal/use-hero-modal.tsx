@@ -5,8 +5,24 @@ import { useEffect, useEffectEvent, useLayoutEffect, useState } from 'react'
 import { getSessionGeneration } from '@shared/api/axios'
 
 import { createHeroModalLifecycle } from './modal-lifecycle'
+import { nextModalPresentation } from './modal-presentation'
 
 export function useHeroModal({ modal, scopeKey }: { modal: NiceModalHandler; scopeKey?: string }) {
+    const [presentation, setPresentation] = useState(() => ({
+        invocation: modal.args as unknown,
+        scope: scopeKey as unknown,
+        visible: modal.visible,
+        key: 0
+    }))
+    const currentPresentation = nextModalPresentation(
+        presentation,
+        modal.args,
+        scopeKey,
+        modal.visible
+    )
+    // A render-time state adjustment resets descendants before they commit. An
+    // effect-based reset would briefly expose the previous opening's form values.
+    if (currentPresentation !== presentation) setPresentation(currentPresentation)
     const [{ owner, setHandler }] = useState(() => {
         let handler = modal
         return {
@@ -27,6 +43,7 @@ export function useHeroModal({ modal, scopeKey }: { modal: NiceModalHandler; sco
         return () => owner.dispose()
     }, [owner])
     return {
+        presentationKey: currentPresentation.key,
         isOpen: modal.visible,
         onOpenChange: (open: boolean) => {
             if (!open) owner.close()

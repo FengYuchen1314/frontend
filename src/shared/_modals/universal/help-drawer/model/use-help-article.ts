@@ -12,7 +12,7 @@ export function useHelpArticle(
     modal: HeroModalController
 ) {
     const [revision, setRevision] = useState(0)
-    const key = JSON.stringify([screen, language, revision])
+    const key = JSON.stringify([screen, language, revision, modal.presentationKey])
     const [state, setState] = useState({
         key: '',
         loading: true,

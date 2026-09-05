@@ -98,7 +98,7 @@ export const RenameModalShared = NiceModal.create(({ name, renameFrom, uuid }: I
                         </Modal.Header>
                         <Modal.Body>
                             <RenameDialogForm
-                                key={renameFrom + ':' + uuid}
+                                key={modal.presentationKey}
                                 definition={renameDefinitions[renameFrom]}
                                 name={name}
                                 uuid={uuid}

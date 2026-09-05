@@ -134,12 +134,12 @@ export function TagsDialogForm({
             {known.isLoading && (
                 <span role="status" className="flex items-center gap-2 text-sm text-muted">
                     <Spinner size="sm" />
-                    Loading tag suggestions…
+                    {t('shared-dialogs.loading-tags')}
                 </span>
             )}
             {known.isError && (
                 <div role="status" className="flex items-center gap-2 text-sm text-warning">
-                    Tag suggestions unavailable
+                    {t('shared-dialogs.tags-unavailable')}
                     <Button
                         type="button"
                         size="sm"
@@ -148,13 +148,11 @@ export function TagsDialogForm({
                             void known.refetch()
                         }}
                     >
-                        Retry
+                        {t('shared-dialogs.retry')}
                     </Button>
                 </div>
             )}
-            <p className="text-sm text-muted">
-                Up to 10 tags. Separate with a comma, space or semicolon.
-            </p>
+            <p className="text-sm text-muted">{t('shared-dialogs.tags-help')}</p>
             {form.formState.errors.root?.server?.message && (
                 <p role="alert" className="text-sm text-danger">
                     {form.formState.errors.root.server.message}
@@ -170,7 +168,7 @@ export function TagsDialogForm({
                         form.setValue('draft', '')
                     }}
                 >
-                    Clear all
+                    {t('shared-dialogs.clear-all')}
                 </Button>
                 <Button type="button" variant="secondary" onPress={modal.close}>
                     {t('common.action.cancel')}
@@ -207,7 +205,7 @@ export const EditTagsModalShared = NiceModal.create(({ editTagsFrom, tags, uuid 
                         </Modal.Header>
                         <Modal.Body>
                             <TagsDialogForm
-                                key={editTagsFrom + ':' + uuid}
+                                key={modal.presentationKey}
                                 definition={tagsDefinitions[editTagsFrom]}
                                 tags={tags}
                                 uuid={uuid}

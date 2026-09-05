@@ -1,177 +1,265 @@
 import type { editor } from 'monaco-editor'
+import type { ComponentType } from 'react'
 
 import NiceModal, { useModal } from '@ebay/nice-modal-react'
-import {
-    ActionIcon,
-    Box,
-    Button,
-    Group,
-    Modal,
-    Paper,
-    ThemeIconProps,
-    Tooltip
-} from '@mantine/core'
+import { Button, Modal, Spinner } from '@heroui/react'
 import { useMonaco } from '@monaco-editor/react'
 import clsx from 'clsx'
-import { ComponentType, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { TbArrowUp, TbBook, TbBraces } from 'react-icons/tb'
 
-import { useNiceMantineModal } from '@shared/_modals/use-nice-modal'
+import type { HeroModalController } from '@shared/_modals/use-hero-modal'
+import { HeroModalPresence, useHeroModal } from '@shared/_modals/use-hero-modal'
 import { COMPACT_MONACO_OPTIONS } from '@shared/constants/monaco-theme'
-import { usePseudoFullscreen } from '@shared/hooks'
+import { usePseudoFullscreen } from '@shared/hooks/use-pseudo-fullscreen'
 import { CodeEditor, editorClasses, EditorFooter, EditorStatusBar } from '@shared/ui/code-editor'
-import { fullscreenClasses, FullscreenToggleButton } from '@shared/ui/fullscreen-toggle-button'
-import { BaseOverlayHeader } from '@shared/ui/overlays/base-overlay-header'
+import type { EditorSetupContext } from '@shared/ui/code-editor/editor-operation-scope'
+import {
+    createEditorOperationScope,
+    runEditorSchemaSetup,
+    saveEditorValue
+} from '@shared/ui/code-editor/editor-operation-scope'
+import { FullscreenToggleButton } from '@shared/ui/fullscreen-toggle-button'
 import { forceMonacoRetokenize } from '@shared/utils/monaco/force-retokenize'
 import { formatFirstErrorMarker } from '@shared/utils/monaco/markers'
 
+import { parseJsonEditorValue } from './json-editor.model'
 import classes from './JsonEditorModal.module.css'
 
 export interface IJsonEditorModalProps {
     docsUrl?: string
-    iconColor?: ThemeIconProps['color']
+    iconColor?: string
     IconComponent?: ComponentType<{ size: number }>
     initialValue: string
-    onSave: (value: string) => void
+    onSave: (value: string) => void | Promise<void>
     path: string
     sample?: string
-    setupSchema?: () => Promise<void> | void
+    setupSchema?: (context: EditorSetupContext) => Promise<void> | void
     title: string
 }
 
-export const JsonEditorModal = NiceModal.create((props: IJsonEditorModalProps) => {
-    const {
-        docsUrl,
-        iconColor = 'teal',
-        IconComponent = TbBraces,
-        initialValue,
-        onSave,
-        path,
-        sample,
-        setupSchema,
-        title
-    } = props
-
-    const modal = useModal()
-    const { modalProps, hide } = useNiceMantineModal({ modal })
-
+export function JsonEditorDialog({
+    modal,
+    initialValue,
+    onSave,
+    setupSchema,
+    path,
+    sample,
+    docsUrl,
+    title,
+    IconComponent = TbBraces,
+    iconColor = 'teal'
+}: IJsonEditorModalProps & { modal: HeroModalController }) {
     const { t } = useTranslation()
-    const { isFullscreen, toggle: toggleFullscreen } = usePseudoFullscreen()
-
+    const fullscreen = usePseudoFullscreen(false, modal.isOpen)
     const monaco = useMonaco()
+    const [scope] = useState(createEditorOperationScope)
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
-
-    const [error, setError] = useState<null | string>(null)
+    const [value, setValue] = useState(initialValue)
+    const [error, setError] = useState<string | null>(null)
+    const [saveError, setSaveError] = useState<string | null>(null)
+    const [ready, setReady] = useState(false)
+    const [saving, setSaving] = useState(false)
+    const [schemaStatus, setSchemaStatus] = useState<'pending' | 'ready' | 'error'>(
+        setupSchema ? 'pending' : 'ready'
+    )
+    const [retry, setRetry] = useState(0)
 
     useEffect(() => {
-        if (!monaco || !setupSchema) return
+        if (modal.isOpen) scope.activate(modal.capture().isCurrent)
+        else scope.cancel()
+        return scope.cancel
+    }, [scope, modal.isOpen, modal.presentationKey])
+    useEffect(() => {
+        if (!monaco || !setupSchema || !modal.isOpen) return
+        const operation = scope.begin()
+        void runEditorSchemaSetup(setupSchema, operation).then((result) => {
+            if (result !== 'stale' && operation.isCurrent()) setSchemaStatus(result)
+            operation.finish()
+        })
+        return operation.cancel
+    }, [monaco, setupSchema, scope, modal.isOpen, retry])
+    useEffect(
+        () => () => {
+            editorRef.current = null
+        },
+        []
+    )
 
-        setupSchema()
-    }, [monaco])
-
-    const handleSave = () => {
-        const currentValue = editorRef.current?.getValue().trim() ?? ''
-
-        if (currentValue !== '') {
-            try {
-                JSON.parse(currentValue)
-            } catch {
-                setError(t('common.message.invalid-json'))
-                return
-            }
-        }
-
-        onSave(currentValue)
-        hide()
+    const close = () => {
+        scope.cancel()
+        fullscreen.close()
+        modal.close()
     }
-
+    const save = async () => {
+        if (!ready || saving || schemaStatus !== 'ready' || error || !scope.isCurrent()) return
+        const parsed = parseJsonEditorValue(editorRef.current?.getValue() ?? value)
+        if (!parsed.valid) {
+            setError(t('common.message.invalid-json'))
+            return
+        }
+        const operation = scope.begin()
+        setSaving(true)
+        setSaveError(null)
+        const result = await saveEditorValue(parsed.value, onSave, operation)
+        if (result === 'saved' && operation.isCurrent()) close()
+        if (result === 'error' && operation.isCurrent())
+            setSaveError('Could not save JSON. Your changes are still here; try again.')
+        if (operation.isCurrent()) setSaving(false)
+        operation.finish()
+    }
     return (
         <Modal
-            {...modalProps}
-            size="900px"
-            title={
-                <BaseOverlayHeader
-                    iconColor={iconColor}
-                    IconComponent={IconComponent}
-                    iconVariant="soft"
-                    title={title}
-                />
-            }
-            transitionProps={{ transition: 'fade', duration: 200 }}
+            isOpen={modal.isOpen}
+            onOpenChange={(open) => {
+                if (!open) close()
+            }}
         >
-            <Box className={clsx(classes.container, isFullscreen && fullscreenClasses.overlay)}>
-                <Paper
-                    className={clsx(
-                        classes.editorWrapper,
-                        editorClasses.editorAttached,
-                        error && classes.editorWrapperError,
-                        isFullscreen && fullscreenClasses.fill
-                    )}
-                    p={0}
-                    pos="relative"
-                    withBorder
-                >
-                    <CodeEditor
-                        defaultLanguage="json"
-                        footer={error && <EditorStatusBar status="error">{error}</EditorStatusBar>}
-                        onMount={(editorInstance) => {
-                            editorRef.current = editorInstance
-
-                            forceMonacoRetokenize(editorInstance)
-                        }}
-                        onValidate={(markers) => setError(formatFirstErrorMarker(markers))}
-                        options={COMPACT_MONACO_OPTIONS}
-                        path={path}
-                        value={initialValue}
-                    />
-                </Paper>
-
-                <EditorFooter className={clsx(error && classes.footerError)}>
-                    <FullscreenToggleButton
-                        floating={false}
-                        isFullscreen={isFullscreen}
-                        onToggle={toggleFullscreen}
-                        size={36}
-                    />
-
-                    {docsUrl && (
-                        <Tooltip label={t('common.action.documentation')}>
-                            <ActionIcon
-                                color="gray"
-                                component="a"
-                                href={docsUrl}
-                                rel="noopener noreferrer"
-                                size={36}
-                                target="_blank"
-                                variant="soft"
+            <Modal.Backdrop isKeyboardDismissDisabled={fullscreen.isFullscreen}>
+                <HeroModalPresence onExitComplete={modal.afterClose} />
+                <Modal.Container scroll="inside" size={fullscreen.isFullscreen ? 'full' : 'lg'}>
+                    <Modal.Dialog
+                        className={clsx(
+                            classes.dialog,
+                            fullscreen.isFullscreen && classes.dialogFull
+                        )}
+                    >
+                        <Modal.CloseTrigger />
+                        <Modal.Header>
+                            <Modal.Heading className="flex items-center gap-2">
+                                <span className="text-accent" data-icon-tone={iconColor}>
+                                    <IconComponent size={22} />
+                                </span>
+                                {title}
+                            </Modal.Heading>
+                        </Modal.Header>
+                        <Modal.Body className={classes.container}>
+                            <div
+                                className={clsx(
+                                    classes.editorWrapper,
+                                    editorClasses.editorAttached,
+                                    error && classes.editorWrapperError,
+                                    fullscreen.isFullscreen && classes.editorFill
+                                )}
                             >
-                                <TbBook size={18} />
-                            </ActionIcon>
-                        </Tooltip>
-                    )}
-
-                    {sample && (
-                        <Button
-                            color="gray"
-                            leftSection={<TbArrowUp size={18} />}
-                            onClick={() => editorRef.current?.setValue(sample)}
-                            variant="soft"
-                        >
-                            {t('common.action.paste-default')}
-                        </Button>
-                    )}
-
-                    <Group gap="sm" ml="auto">
-                        <Button onClick={hide} variant="subtle">
-                            {t('common.action.cancel')}
-                        </Button>
-                        <Button onClick={handleSave} variant="soft" disabled={!!error}>
-                            {t('common.action.save')}
-                        </Button>
-                    </Group>
-                </EditorFooter>
-            </Box>
+                                <CodeEditor
+                                    defaultLanguage="json"
+                                    footer={
+                                        (error || saveError) && (
+                                            <EditorStatusBar status="error">
+                                                {error || saveError}
+                                            </EditorStatusBar>
+                                        )
+                                    }
+                                    onChange={(next) => {
+                                        if (scope.isCurrent()) {
+                                            setValue(next ?? '')
+                                            setError(null)
+                                            setSaveError(null)
+                                        }
+                                    }}
+                                    onMount={(instance) => {
+                                        if (scope.isCurrent()) {
+                                            editorRef.current = instance
+                                            setReady(true)
+                                            forceMonacoRetokenize(instance)
+                                        }
+                                    }}
+                                    onValidate={(markers) => {
+                                        if (scope.isCurrent())
+                                            setError(formatFirstErrorMarker(markers))
+                                    }}
+                                    options={{
+                                        ...COMPACT_MONACO_OPTIONS,
+                                        ariaLabel: title,
+                                        readOnly: saving
+                                    }}
+                                    path={path}
+                                    value={value}
+                                />
+                            </div>
+                            {schemaStatus === 'pending' && (
+                                <div
+                                    className="flex items-center gap-2 p-2 text-sm text-muted"
+                                    role="status"
+                                >
+                                    <Spinner size="sm" />
+                                    Loading JSON schema…
+                                </div>
+                            )}
+                            {schemaStatus === 'error' && (
+                                <EditorStatusBar status="error">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <span>Could not load JSON schema.</span>
+                                        <Button
+                                            onPress={() => {
+                                                setSchemaStatus('pending')
+                                                setRetry((current) => current + 1)
+                                            }}
+                                            size="sm"
+                                            variant="secondary"
+                                        >
+                                            {t('common.action.try-again')}
+                                        </Button>
+                                    </div>
+                                </EditorStatusBar>
+                            )}
+                            <EditorFooter className={clsx(error && classes.footerError)}>
+                                <FullscreenToggleButton
+                                    floating={false}
+                                    isFullscreen={fullscreen.isFullscreen}
+                                    onToggle={fullscreen.toggle}
+                                />
+                                {docsUrl && (
+                                    <a
+                                        aria-label={t('common.action.documentation')}
+                                        className={classes.docsLink}
+                                        href={docsUrl}
+                                        rel="noopener noreferrer"
+                                        target="_blank"
+                                    >
+                                        <TbBook size={18} />
+                                    </a>
+                                )}
+                                {sample && (
+                                    <Button
+                                        isDisabled={!ready || saving}
+                                        onPress={() => {
+                                            setValue(sample)
+                                            setError(null)
+                                        }}
+                                        variant="secondary"
+                                    >
+                                        <TbArrowUp size={18} />
+                                        {t('common.action.paste-default')}
+                                    </Button>
+                                )}
+                                <div className="ms-auto flex gap-2">
+                                    <Button onPress={close} variant="ghost">
+                                        {t('common.action.cancel')}
+                                    </Button>
+                                    <Button
+                                        isDisabled={!ready || schemaStatus !== 'ready' || !!error}
+                                        isPending={saving}
+                                        onPress={() => {
+                                            void save()
+                                        }}
+                                    >
+                                        {t('common.action.save')}
+                                    </Button>
+                                </div>
+                            </EditorFooter>
+                        </Modal.Body>
+                    </Modal.Dialog>
+                </Modal.Container>
+            </Modal.Backdrop>
         </Modal>
     )
+}
+
+export const JsonEditorModal = NiceModal.create((props: IJsonEditorModalProps) => {
+    const niceModal = useModal()
+    const modal = useHeroModal({ modal: niceModal, scopeKey: props.path })
+    return <JsonEditorDialog {...props} key={modal.presentationKey} modal={modal} />
 })

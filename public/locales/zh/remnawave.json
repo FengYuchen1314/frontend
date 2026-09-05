@@ -1,4 +1,19 @@
 {
+  "shared-dialogs": {
+    "created": "创建成功",
+    "create-failed": "创建失败",
+    "creation-context-unavailable": "缺少创建上下文，请关闭后从对应页面重新打开。",
+    "retry": "重试",
+    "loading-documentation": "正在加载帮助文档…",
+    "loading-tags": "正在加载标签建议…",
+    "tags-unavailable": "暂时无法加载标签建议",
+    "tags-help": "最多 10 个标签，用逗号、空格或分号分隔。",
+    "clear-all": "清空全部",
+    "renamed": "重命名成功",
+    "rename-failed": "重命名失败",
+    "tags-updated": "标签已更新",
+    "tags-failed": "标签更新失败"
+  },
   "constants": {
     "home": "首页",
     "hosts": "主机",
